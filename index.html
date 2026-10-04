@@ -465,9 +465,10 @@ body{
     <div class="ov-tag" id="ovTag">ENDING</div>
     <h3 id="ovTitle">结局</h3>
     <p id="ovDesc"></p>
-    <button class="btn primary" id="ovRewind">◀ 回到刚才的选择</button>
-    <button class="btn" id="ovRestart">↻ 重玩本章</button>
-    <button class="btn" id="ovClose">继续停留在此</button>
+    <button class="btn primary" id="ovNext" style="display:none">▶ 继续下一章</button>
+<button class="btn" id="ovRewind">◀ 回到刚才的选择</button>
+<button class="btn" id="ovRestart">↻ 重玩本章</button>
+<button class="btn" id="ovClose">继续停留在此</button>
   </div>
 </div>
 
@@ -801,23 +802,37 @@ function finish(st){
   clearChoices();
   setHint(false);
 
+  const ch = Game.chapters[S.chId];
+  const nextId = ch && ch.nextChapter;
+  const hasNext = nextId && Game.chapters[nextId];
+
   if(st && st.id){
     unlockedEndings.add(st.id);
     persistEndings();
     const meta = Game.endings[st.id] || { name:'未命名结局', desc:'' };
-    showOverlay('ENDING', meta.name || st.id, meta.desc || '');
+    showOverlay('ENDING', meta.name || st.id, meta.desc || '', hasNext ? nextId : null);
   }else{
-    showOverlay('CHAPTER', '本章结束', '故事在这里暂时停下了。');
+    showOverlay('CHAPTER', '本章结束', '故事在这里暂时停下了。', hasNext ? nextId : null);
   }
   save();
 }
 
 /* ══════════════════ 覆盖层 ══════════════════ */
 const ov = $('#ov');
-function showOverlay(tag, title, desc){
+
+function showOverlay(tag, title, desc, nextId){
   $('#ovTag').textContent = tag;
   $('#ovTitle').textContent = title;
   $('#ovDesc').textContent = desc || '';
+  const nb = $('#ovNext');
+  if(nextId && Game.chapters[nextId]){
+    nb.style.display = '';
+    nb.dataset.next = nextId;
+    nb.textContent = '▶ 继续下一章';
+  }else{
+    nb.style.display = 'none';
+    nb.dataset.next = '';
+  }
   ov.classList.add('is-on');
 }
 function hideOverlay(){ ov.classList.remove('is-on'); }
@@ -825,6 +840,12 @@ function hideOverlay(){ ov.classList.remove('is-on'); }
 $('#ovClose').addEventListener('click', hideOverlay);
 $('#ovRestart').addEventListener('click', () => { hideOverlay(); startChapter(S.chId); });
 $('#ovRewind').addEventListener('click', () => { hideOverlay(); rewindToChoice(); });
+$('#ovNext').addEventListener('click', () => {
+  const id = $('#ovNext').dataset.next;
+  if(!id || !Game.chapters[id]) return;
+  hideOverlay();
+  startChapter(id);
+});
 
 /* ══════════════════ 回退 ══════════════════ */
 function rewind(){
@@ -888,11 +909,18 @@ function restartCurrent(){
 /* ══════════════════ 存档 ══════════════════ */
 function save(){
   try{
-    if(S.ended){ localStorage.removeItem(SAVE_KEY); return; }
-    localStorage.setItem(SAVE_KEY, JSON.stringify({
-      chId:S.chId, node:S.node, idx:S.idx,
-      attrs:S.attrs, flags:S.flags, log:S.log
-    }));
+    // 无论是否 ended，都把「当前章节 + 属性 + flags」存下来，
+    // 只是 ended 时不再存节点进度（因为节点进度已无意义）
+    const payload = {
+      chId: S.chId,
+      node: S.ended ? null : S.node,
+      idx:  S.ended ? 0    : S.idx,
+      attrs: S.attrs,
+      flags: S.flags,
+      log:   S.ended ? []  : S.log,
+      ended: S.ended
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
   }catch(e){}
 }
 function load(){
@@ -901,13 +929,35 @@ function load(){
     if(!raw) return false;
     const d = JSON.parse(raw);
     if(!d.chId || !Game.chapters[d.chId]) return false;
-    S.chId = d.chId; S.node = d.node; S.idx = d.idx;
+
+    // 恢复属性、flags（跨章节继承的关键）
     S.attrs = Object.assign(freshAttrs(), d.attrs || {});
     S.flags = d.flags || {};
-    S.log = d.log || [];
-    S.ended = false; S.awaiting = false;
     history = [];
-    renderHud(); renderLog(); updateChapterTitle();
+    S.awaiting = false;
+
+    // 情况一：上次停在一章结束（ended）→ 从该章的结尾续上
+    if(d.ended){
+      const ch = Game.chapters[d.chId];
+      // 试着跳到该章配置的下一章
+      if(ch && ch.nextChapter && Game.chapters[ch.nextChapter]){
+        startChapter(ch.nextChapter);
+        return true;
+      }
+      // 没配下一章，就回到该章的起点重新展示
+      startChapter(d.chId);
+      return true;
+    }
+
+    // 情况二：上次停在章节中途 → 原地恢复
+    S.chId = d.chId;
+    S.node = d.node;
+    S.idx  = d.idx;
+    S.log  = d.log || [];
+    S.ended = false;
+    renderHud();
+    renderLog();
+    updateChapterTitle();
     step();
     return true;
   }catch(e){ return false; }
@@ -1141,8 +1191,6 @@ renderHud();
 const loaded = load();
 if(!loaded){
   if(Game.order.length) startChapter(Game.order[0]);
-}else{
-  updateChapterTitle();
 }
 renderChapterList();
 renderEndings();

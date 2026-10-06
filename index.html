@@ -1,1812 +1,3377 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+<!--
+================================================================================
+  和室友恋爱的错误示范 · 单文件文字游戏引擎
+================================================================================
+
+  【如何导入新章节 / Q&A / 档案 / 关系 / 彩蛋副本】
+
+  1. 打开游戏 → 主页 → 「代码工坊」
+  2. 在顶部选择数据类型（章节 / 羁绊问答 / 角色档案 / 人际关系 / 彩蛋副本 / 好感度等级表）
+  3. 把 JSON 粘贴进输入框（可以粘贴单个对象，也可以粘贴一个数组一次导入多条）
+  4. 点击「校验并导入」
+  5. 若 id 已存在 → 整体覆盖更新；若 id 是新的 → 追加
+  6. 导入成功立即生效，写入 localStorage，退出浏览器不丢失
+
+  【导出 / 分享】
+  主页 → 「分享」→ 生成 HZY_export_日期时间.json
+  对方在主页 → 「导入」→ 选择该文件 → 即可获得同样的剧情库 + 存档 + 解锁状态
+
+  【数据 key 约定】
+  hzy_save_main            主线存档
+  hzy_save_slots_1~3       手动存档槽
+  hzy_save_side_<id>       彩蛋副本独立存档
+  hzy_data_chapters        章节库
+  hzy_data_qna             羁绊问答库
+  hzy_data_charinfo        角色档案库
+  hzy_data_relations       人际关系库
+  hzy_data_sides           彩蛋副本库
+  hzy_data_affection_levels 好感度等级表
+  hzy_config               UI 配置
+================================================================================
+-->
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>合租事故 · Co-habitation Incident</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#FFFBF2">
+<title>和室友恋爱的错误示范</title>
 <style>
+/* ============================================================================
+   0. 变量 / 主题
+   ============================================================================ */
 :root{
-  --ink:#2B3138; --ink2:#5F6975; --ink3:#9AA2AC;
-  --gold:#B99A5B; --gold-deep:#8A6E36; --gold-lite:#E8DCC1;
-  --navy:#4A6C8C; --navy-deep:#33506B;
-  --card:rgba(255,255,255,.78);
-  --shadow:0 10px 34px rgba(140,120,70,.11);
-  --shadow-s:0 4px 16px rgba(140,120,70,.08);
-  --line:rgba(185,154,91,.22);
-  --r:18px;
+  --bg:#FFFBF2;
+  --bg2:#FDF5E7;
+  --paper:#FFFFFF;
+  --paper-2:#FFFDF8;
+  --ink:#3A322C;
+  --ink-soft:#8A7C6E;
+  --ink-faint:#B9AC9C;
+  --cash:#E86A48;
+  --cash-soft:#F5B7A2;
+  --mott:#4A6FA5;
+  --mott-soft:#A8C0DE;
+  --gold:#F2C14E;
+  --line:#EBE0CF;
+  --line-soft:#F4ECDF;
+  --shadow:0 4px 18px rgba(140,115,85,.10);
+  --shadow-lg:0 12px 40px rgba(140,115,85,.18);
+  --radius:16px;
+  --font-serif:"Noto Serif SC","Source Han Serif SC","Songti SC",Georgia,"PingFang SC",serif;
+  --font-sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",-apple-system,sans-serif;
+  --fs:1;
 }
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{height:100%}
+[data-theme="dark"]{
+  --bg:#1C1917;
+  --bg2:#231F1C;
+  --paper:#2A2522;
+  --paper-2:#302A26;
+  --ink:#EDE4D8;
+  --ink-soft:#A99A88;
+  --ink-faint:#6E6257;
+  --line:#3B3430;
+  --line-soft:#332D29;
+  --shadow:0 4px 18px rgba(0,0,0,.45);
+  --shadow-lg:0 12px 40px rgba(0,0,0,.6);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
 body{
-  margin:0;overflow:hidden;
-  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  font-family:var(--font-serif);
+  font-size:calc(16px * var(--fs));
+  background:var(--bg);
   color:var(--ink);
-  background:linear-gradient(165deg,#F8F7F4 0%,#F1EFEA 45%,#E8E5DE 100%);
+  line-height:1.85;
+  overflow:hidden;
   -webkit-font-smoothing:antialiased;
+  transition:background .3s ease,color .3s ease;
 }
-/* 背景装饰 */
-.deco{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:0}
-.blob{position:absolute;border-radius:50%;filter:blur(70px);opacity:.55}
-.b1{width:420px;height:420px;background:#EFE7D4;top:-140px;left:-120px}
-.b2{width:360px;height:360px;background:#E6E2D6;bottom:-130px;right:-100px}
-.b3{width:280px;height:280px;background:#F4EFE2;top:40%;left:55%}
+button{font-family:inherit;color:inherit;border:none;background:none;cursor:pointer;font-size:inherit;}
+input,textarea,select{font-family:var(--font-sans);color:inherit;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px;}
+::-webkit-scrollbar-track{background:transparent;}
 
-.app{
-  position:relative;z-index:1;
-  width:min(100%,900px);height:100dvh;margin:0 auto;
-  display:flex;flex-direction:column;gap:10px;padding:12px;
+/* ============================================================================
+   1. 页面容器
+   ============================================================================ */
+#app{position:fixed;inset:0;overflow:hidden;}
+.page{
+  position:absolute;inset:0;
+  display:none;
+  flex-direction:column;
+  opacity:0;
+  transition:opacity .3s ease;
 }
+.page.active{display:flex;opacity:1;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+.fade-in{animation:fadeIn .35s ease both;}
 
-/* ── 顶栏 ── */
-.topbar{
-  flex:none;display:flex;align-items:center;gap:12px;
-  padding:9px 12px;border-radius:var(--r);
-  background:var(--card);backdrop-filter:blur(18px);
-  border:1px solid rgba(255,255,255,.9);
-  box-shadow:var(--shadow);
-}
-.brand{display:flex;align-items:center;gap:9px;flex:none}
-.mark{
-  width:26px;height:26px;border-radius:9px;flex:none;
-  background:linear-gradient(140deg,#E3D4B2,#B99A5B);
-  box-shadow:0 4px 12px rgba(185,154,91,.42);
-  position:relative;
-}
-.mark::after{
-  content:'';position:absolute;inset:6px;
-  border-radius:4px;background:rgba(255,255,255,.8);
-  clip-path:polygon(0 60%,50% 0,100% 60%,100% 100%,0 100%);
-}
-.brand-txt{line-height:1.1}
-.brand-txt b{font-size:14px;letter-spacing:.5px;font-weight:600}
-.brand-txt i{
-  display:block;font-style:normal;font-size:8.5px;
-  letter-spacing:1.6px;color:var(--ink3);text-transform:uppercase;margin-top:2px;
-}
-.tabs{display:flex;gap:3px;margin-left:auto;overflow-x:auto;scrollbar-width:none}
-.tabs::-webkit-scrollbar{display:none}
-.tab{
-  border:0;background:transparent;color:var(--ink2);font-family:inherit;
-  font-size:12.5px;padding:7px 11px;border-radius:10px;cursor:pointer;
-  white-space:nowrap;transition:.2s;
-}
-.tab:hover{background:rgba(200,175,120,.13);color:var(--gold-deep)}
-.tab.is-on{
-  background:linear-gradient(135deg,#EDE2C8,#CDB176);
-  color:#4A3A16;font-weight:600;
-  box-shadow:0 4px 12px rgba(185,154,91,.3);
+/* CRT 滤镜（可选开关） */
+body.crt::after{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:9999;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.035) 0px,rgba(0,0,0,.035) 1px,transparent 1px,transparent 3px);
+  mix-blend-mode:multiply;
 }
 
-/* ── 视图容器 ── */
-.views{flex:1;min-height:0;position:relative}
-.view{position:absolute;inset:0;display:none;flex-direction:column;gap:9px;overflow:hidden}
-.view.is-on{display:flex}
+/* ============================================================================
+   2. 主页
+   ============================================================================ */
+#page-home{
+  align-items:center;justify-content:center;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(232,106,72,.09), transparent 45%),
+    radial-gradient(circle at 84% 82%, rgba(74,111,165,.09), transparent 45%),
+    var(--bg);
+  overflow-y:auto;
+}
+.home-deco{
+  position:absolute;inset:0;pointer-events:none;overflow:hidden;
+}
+.home-deco .fox{
+  position:absolute;right:-8%;bottom:-6%;width:min(58vw,520px);opacity:.055;
+  fill:var(--cash);
+}
+[data-theme="dark"] .home-deco .fox{opacity:.09;}
+.home-deco .staff{
+  position:absolute;left:-6%;top:8%;width:min(40vw,320px);opacity:.05;
+  fill:var(--mott);
+}
+.home-deco .dot{
+  position:absolute;border-radius:50%;filter:blur(1px);
+  animation:floaty 9s ease-in-out infinite;
+}
+@keyframes floaty{0%,100%{transform:translateY(0) rotate(0);}50%{transform:translateY(-22px) rotate(12deg);}}
 
-/* ── 属性条 ── */
-.hud{
-  flex:none;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;
-  padding:7px 10px;border-radius:14px;
-  background:var(--card);backdrop-filter:blur(14px);
-  border:1px solid rgba(255,255,255,.85);box-shadow:var(--shadow-s);
+.home-inner{
+  position:relative;z-index:2;
+  width:min(560px,90vw);
+  padding:48px 24px 40px;
+  text-align:center;
 }
-.hud::-webkit-scrollbar{display:none}
-.chip{
-  display:flex;align-items:center;gap:5px;flex:none;
-  font-size:11.5px;color:var(--ink2);
-  padding:3px 9px;border-radius:9px;background:rgba(255,255,255,.72);
-  border:1px solid rgba(200,175,120,.22);
+.home-sub{
+  font-family:var(--font-sans);
+  font-size:.74rem;letter-spacing:.42em;text-transform:uppercase;
+  color:var(--ink-faint);margin-bottom:22px;
 }
-.chip i{width:7px;height:7px;border-radius:50%;display:block}
-.chip b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
-.chip.bump{animation:chipBump .55s ease}
-@keyframes chipBump{0%{transform:scale(1)}35%{transform:scale(1.12);background:#FBF4E4}100%{transform:scale(1)}}
-
-/* ── 舞台 ── */
-.stage{
-  flex:1;min-height:0;overflow-y:auto;position:relative;
-  padding:24px 22px 70px;border-radius:var(--r);cursor:pointer;
-  background:var(--card);backdrop-filter:blur(18px);
-  border:1px solid rgba(255,255,255,.9);box-shadow:var(--shadow);
-  scroll-behavior:smooth;overscroll-behavior:contain;
+.home-title{
+  font-size:clamp(2rem,8.5vw,3.1rem);
+  font-weight:600;
+  letter-spacing:.10em;
+  line-height:1.35;
+  margin-bottom:6px;
+  background:linear-gradient(135deg,var(--ink) 20%,var(--cash) 130%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
 }
-.stage::-webkit-scrollbar{width:6px}
-.stage::-webkit-scrollbar-thumb{background:rgba(185,154,91,.3);border-radius:3px}
-.stage::-webkit-scrollbar-track{background:transparent}
-
-.line{animation:rise .38s cubic-bezier(.2,.85,.3,1) both}
-@keyframes rise{from{opacity:0;transform:translateY(11px)}to{opacity:1;transform:none}}
-
-/* 场景卡 */
-.scene-title{
-  text-align:center;font-size:12px;letter-spacing:.42em;text-indent:.42em;
-  color:var(--gold-deep);font-weight:700;
-  margin:6px 0 24px;position:relative;padding:0 12px;
+[data-theme="dark"] .home-title{
+  background:linear-gradient(135deg,var(--ink) 20%,var(--cash-soft) 130%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
 }
-.scene-title::before,.scene-title::after{
-  content:'';position:absolute;top:50%;width:24%;height:1px;
+.home-tagline{
+  font-size:.92rem;color:var(--ink-soft);letter-spacing:.12em;
+  margin-bottom:40px;
 }
-.scene-title::before{left:0;background:linear-gradient(90deg,transparent,var(--gold-lite))}
-.scene-title::after{right:0;background:linear-gradient(270deg,transparent,var(--gold-lite))}
-
-/* 旁白 */
-.narr{
-  font-size:14.5px;line-height:1.95;color:var(--ink2);
-  margin:0 0 15px;padding-left:13px;
-  border-left:2px solid rgba(200,175,120,.32);
+.home-actions{
+  display:flex;flex-direction:column;gap:12px;
+  margin-bottom:32px;
 }
-/* 对话 */
-.say{margin:0 0 17px;display:flex;flex-direction:column;gap:6px}
-.who{
-  display:flex;align-items:center;gap:7px;
-  font-size:12px;font-weight:700;letter-spacing:.6px;
-}
-.who::before{
-  content:'';width:12px;height:2px;border-radius:2px;
-  background:currentColor;opacity:.5;
-}
-.bubble{
-  align-self:flex-start;max-width:90%;
-  padding:12px 16px;font-size:15px;line-height:1.8;color:var(--ink);
-  background:linear-gradient(135deg,rgba(255,255,255,.98),rgba(248,243,231,.95));
-  border:1px solid rgba(200,175,120,.3);
-  border-radius:4px 16px 16px 16px;
-  box-shadow:0 5px 16px rgba(150,125,70,.1);
-}
-.bubble .b-cn{
-  font-size:12.5px;color:var(--ink3);line-height:1.7;
-  margin-top:7px;padding-top:7px;
-  border-top:1px dashed rgba(200,175,120,.35);
-}
-.hr{
-  height:1px;margin:20px 0 22px;border:0;
-  background:linear-gradient(90deg,transparent,rgba(185,154,91,.45),transparent);
-}
-
-.tap-hint{
-  position:absolute;right:20px;bottom:16px;
-  font-size:11px;color:var(--ink3);letter-spacing:1px;
-  animation:bob 1.8s ease-in-out infinite;pointer-events:none;
-  transition:opacity .3s;
-}
-.tap-hint.off{opacity:0}
-@keyframes bob{0%,100%{transform:translateY(0);opacity:.5}50%{transform:translateY(4px);opacity:.95}}
-
-/* ── 选项 ── */
-.choices{flex:none;display:flex;flex-direction:column;gap:7px;max-height:42%;overflow-y:auto}
-.choices:empty{display:none}
-.choice{
-  position:relative;width:100%;text-align:left;overflow:hidden;
-  padding:13px 18px;border-radius:14px;cursor:pointer;
-  font-family:inherit;font-size:14.5px;color:var(--ink);
-  border:1px solid rgba(200,175,120,.42);
-  background:linear-gradient(135deg,rgba(255,255,255,.95),rgba(246,241,229,.92));
-  box-shadow:var(--shadow-s);
-  transition:.22s cubic-bezier(.2,.8,.3,1);
-  animation:rise .3s cubic-bezier(.2,.85,.3,1) both;
-}
-.choice::before{
-  content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
-  background:linear-gradient(180deg,var(--gold-lite),var(--gold));
-  transform:scaleY(0);transform-origin:center;transition:.25s;
-}
-.choice:hover{
-  transform:translateX(5px);
-  border-color:rgba(185,154,91,.75);
-  box-shadow:0 8px 22px rgba(170,140,80,.2);
-}
-.choice:hover::before{transform:scaleY(1)}
-
-/* ── 工具栏 ── */
-.tools{flex:none;display:flex;gap:7px}
-.tools button{
-  flex:1;padding:11px 6px;border-radius:13px;cursor:pointer;
-  font-family:inherit;font-size:12.5px;color:var(--ink2);
-  border:1px solid rgba(255,255,255,.9);
-  background:var(--card);backdrop-filter:blur(14px);
-  box-shadow:var(--shadow-s);transition:.2s;
-}
-.tools button:hover{background:#fff;color:var(--gold-deep);transform:translateY(-1px)}
-.tools button:disabled{opacity:.38;cursor:not-allowed;transform:none}
-.tools button.on{background:linear-gradient(135deg,#EDE2C8,#CDB176);color:#4A3A16;font-weight:600}
-
-/* ── 通用面板 ── */
-.panel{
-  flex:1;min-height:0;overflow-y:auto;padding:20px;
-  border-radius:var(--r);background:var(--card);backdrop-filter:blur(18px);
-  border:1px solid rgba(255,255,255,.9);box-shadow:var(--shadow);
-}
-.panel::-webkit-scrollbar{width:6px}
-.panel::-webkit-scrollbar-thumb{background:rgba(185,154,91,.3);border-radius:3px}
-.p-title{
-  font-size:15px;font-weight:600;color:var(--ink);margin:0 0 3px;
-  display:flex;align-items:center;gap:8px;
-}
-.p-title::before{
-  content:'';width:3px;height:15px;border-radius:2px;
-  background:linear-gradient(180deg,var(--gold-lite),var(--gold));
-}
-.p-sub{font-size:12px;color:var(--ink3);margin:0 0 16px;line-height:1.7}
-.p-sub code{
-  background:rgba(255,255,255,.85);padding:1px 6px;border-radius:5px;
-  font-size:11px;color:var(--gold-deep);border:1px solid var(--line);
-}
-
-/* 章节卡 */
-.ch-list{display:flex;flex-direction:column;gap:9px}
-.ch-card{
-  display:flex;align-items:center;gap:14px;padding:15px 17px;
-  border-radius:16px;cursor:pointer;transition:.22s;
-  background:linear-gradient(135deg,rgba(255,255,255,.93),rgba(247,242,230,.9));
-  border:1px solid rgba(255,255,255,.95);box-shadow:var(--shadow-s);
-}
-.ch-card:hover{transform:translateY(-2px);border-color:rgba(185,154,91,.6);box-shadow:var(--shadow)}
-.ch-num{
-  width:38px;height:38px;flex:none;border-radius:12px;display:grid;place-items:center;
-  font-size:14px;font-weight:600;color:var(--gold-deep);
-  background:linear-gradient(140deg,#F1E8D2,#DBC79A);
-}
-.ch-meta{flex:1;min-width:0}
-.ch-meta b{display:block;font-size:14px;font-weight:600;margin-bottom:3px}
-.ch-meta span{font-size:11.5px;color:var(--ink3);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ch-state{
-  font-size:10.5px;padding:3px 9px;border-radius:8px;flex:none;
-  background:rgba(220,200,150,.25);color:var(--gold-deep);
-}
-
-/* 结局卡 */
-.ed-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:9px}
-.ed-card{
-  padding:15px 16px;border-radius:15px;position:relative;overflow:hidden;
-  background:linear-gradient(140deg,rgba(255,255,255,.95),rgba(246,241,229,.9));
-  border:1px solid rgba(255,255,255,.95);box-shadow:var(--shadow-s);
-  transition:.2s;
-}
-.ed-card b{display:block;font-size:13px;margin-bottom:6px}
-.ed-card p{margin:0;font-size:11.5px;line-height:1.7;color:var(--ink3)}
-.ed-card.locked{opacity:.6;filter:grayscale(.5)}
-.ed-card.locked b{color:var(--ink3)}
-.ed-card.unlocked::after{
-  content:'';position:absolute;top:0;right:0;width:36px;height:36px;
-  background:linear-gradient(225deg,rgba(210,185,120,.5),transparent 70%);
-}
-.ed-badge{
-  position:absolute;bottom:10px;right:12px;font-size:10px;color:var(--ink3);
-}
-
-/* 状态条 */
-.st-row{display:flex;align-items:center;gap:12px;margin-bottom:14px}
-.st-name{width:70px;flex:none;font-size:12.5px;color:var(--ink2)}
-.st-bar{flex:1;height:8px;border-radius:5px;background:rgba(220,205,170,.28);overflow:hidden}
-.st-bar i{display:block;height:100%;border-radius:5px;transition:width .5s cubic-bezier(.2,.8,.3,1)}
-.st-val{width:34px;text-align:right;font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums}
-
-/* 回顾 */
-.rc-n{font-size:13px;line-height:1.85;color:var(--ink2);margin-bottom:10px;padding-left:11px;border-left:2px solid rgba(200,175,120,.3)}
-.rc-s{margin-bottom:11px;font-size:13px;line-height:1.75}
-.rc-s b{display:block;font-size:11px;letter-spacing:.5px;margin-bottom:3px}
-.rc-s i{display:block;font-style:normal;font-size:11.5px;color:var(--ink3);margin-top:3px}
-.rc-scene{
-  text-align:center;font-size:11px;letter-spacing:.35em;color:var(--gold-deep);
-  font-weight:700;margin:20px 0 16px;
-}
-.rc-hr{height:1px;margin:14px 0;background:linear-gradient(90deg,transparent,rgba(185,154,91,.4),transparent)}
-
-/* 工坊 */
-.ta{
-  width:100%;height:230px;padding:14px;border-radius:14px;resize:vertical;
-  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-  font-size:12px;line-height:1.7;color:var(--ink);
-  background:rgba(255,255,255,.85);
-  border:1px solid rgba(200,175,120,.4);outline:none;
-  transition:.2s;tab-size:2;
-}
-.ta:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(185,154,91,.13)}
-.btn-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
 .btn{
-  padding:10px 18px;border-radius:12px;cursor:pointer;font-family:inherit;font-size:13px;
-  border:1px solid rgba(200,175,120,.45);color:var(--ink2);
-  background:linear-gradient(135deg,rgba(255,255,255,.95),rgba(246,241,229,.92));
-  box-shadow:var(--shadow-s);transition:.2s;
+  position:relative;
+  padding:14px 24px;
+  border-radius:14px;
+  background:var(--paper);
+  border:1px solid var(--line);
+  box-shadow:var(--shadow);
+  letter-spacing:.12em;
+  font-size:.96rem;
+  transition:transform .2s ease,box-shadow .2s ease,background .2s ease,border-color .2s ease;
 }
-.btn:hover{transform:translateY(-1px);border-color:var(--gold);color:var(--gold-deep)}
-.btn.primary{
-  background:linear-gradient(135deg,#DCC79A,#B99A5B);color:#fff;border-color:transparent;
-  box-shadow:0 6px 18px rgba(185,154,91,.36);
+.btn:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);border-color:var(--cash-soft);}
+.btn:active{transform:translateY(0) scale(.985);}
+.btn-primary{
+  background:linear-gradient(135deg,var(--cash),#D9553A);
+  color:#fff;border-color:transparent;
+  box-shadow:0 8px 26px rgba(232,106,72,.32);
 }
-.btn.primary:hover{color:#fff}
-.msg{font-size:12px;margin-top:10px;padding:9px 13px;border-radius:10px;display:none;line-height:1.7}
-.msg.ok{display:block;background:rgba(170,215,185,.22);color:#3B7355}
-.msg.err{display:block;background:rgba(235,175,165,.2);color:#A05548}
+.btn-primary:hover{box-shadow:0 12px 34px rgba(232,106,72,.44);}
+.btn[disabled]{opacity:.42;cursor:not-allowed;transform:none!important;box-shadow:var(--shadow)!important;}
+.btn.sm{padding:9px 16px;font-size:.85rem;border-radius:11px;}
+.home-foot{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+.mini{
+  font-family:var(--font-sans);
+  font-size:.78rem;letter-spacing:.14em;color:var(--ink-soft);
+  padding:7px 14px;border-radius:20px;border:1px dashed var(--line);
+  transition:all .2s ease;
+}
+.mini:hover{color:var(--cash);border-color:var(--cash-soft);background:var(--paper);}
+.home-version{
+  margin-top:34px;font-family:var(--font-sans);font-size:.68rem;
+  color:var(--ink-faint);letter-spacing:.16em;
+}
+.integrity-banner{
+  margin:0 auto 22px;max-width:520px;
+  background:#FFF4E0;border:1px solid #F2D9A8;border-radius:12px;
+  padding:12px 16px;font-size:.82rem;color:#8A6A2E;text-align:left;
+  font-family:var(--font-sans);
+}
+[data-theme="dark"] .integrity-banner{background:#3A2F1E;border-color:#5A4726;color:#E0C48A;}
 
-/* 结局弹层 */
-.overlay{
-  position:fixed;inset:0;z-index:50;display:none;
-  align-items:center;justify-content:center;padding:24px;
-  background:rgba(240,236,226,.72);backdrop-filter:blur(8px);
+/* ============================================================================
+   3. 游戏页
+   ============================================================================ */
+#page-game{background:var(--bg);}
+.game-top{
+  flex:0 0 auto;
+  display:flex;align-items:center;gap:12px;
+  padding:10px 14px;
+  padding-top:calc(10px + env(safe-area-inset-top));
+  background:var(--bg2);
+  border-bottom:1px solid var(--line-soft);
+  z-index:5;
 }
-.overlay.is-on{display:flex;animation:fade .35s both}
-@keyframes fade{from{opacity:0}to{opacity:1}}
-.ov-card{
-  width:min(420px,100%);padding:32px 28px;text-align:center;border-radius:24px;
-  background:linear-gradient(160deg,rgba(255,255,255,.98),rgba(246,241,229,.96));
-  border:1px solid rgba(255,255,255,1);
-  box-shadow:0 24px 60px rgba(140,115,60,.24);
-  animation:pop .45s cubic-bezier(.2,.9,.3,1) both;
+.icon-btn{
+  width:34px;height:34px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.05rem;color:var(--ink-soft);
+  transition:background .2s ease,color .2s ease;
+  flex:0 0 auto;
 }
-@keyframes pop{from{opacity:0;transform:scale(.92) translateY(14px)}to{opacity:1;transform:none}}
-.ov-tag{
-  display:inline-block;font-size:10.5px;letter-spacing:2px;color:var(--gold-deep);
-  background:rgba(220,200,150,.25);padding:4px 12px;border-radius:8px;margin-bottom:16px;
+.icon-btn:hover{background:var(--paper);color:var(--cash);}
+.chapter-title{
+  flex:1 1 auto;min-width:0;
+  font-size:.85rem;letter-spacing:.08em;color:var(--ink-soft);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
-.ov-card h3{margin:0 0 12px;font-size:19px;font-weight:600;letter-spacing:.5px}
-.ov-card p{margin:0 0 24px;font-size:13px;line-height:1.9;color:var(--ink2);white-space:pre-line}
-.ov-card .btn{width:100%;margin-bottom:8px}
+.aff-wrap{flex:0 0 auto;display:flex;align-items:center;gap:8px;}
+.aff-track{
+  position:relative;width:clamp(70px,20vw,130px);height:8px;
+  background:var(--line-soft);border-radius:8px;overflow:hidden;
+  border:1px solid var(--line);
+}
+.aff-fill{
+  height:100%;width:0%;
+  background:linear-gradient(90deg,var(--gold),var(--cash));
+  border-radius:8px;
+  transition:width .55s cubic-bezier(.2,.9,.3,1);
+}
+.aff-num{
+  font-family:var(--font-sans);font-size:.78rem;font-weight:600;
+  color:var(--cash);min-width:26px;text-align:right;
+}
+.aff-level-tag{
+  font-family:var(--font-sans);font-size:.66rem;
+  padding:2px 8px;border-radius:10px;
+  background:linear-gradient(135deg,rgba(242,193,78,.24),rgba(232,106,72,.24));
+  color:var(--cash);white-space:nowrap;
+}
 
-@media(max-width:560px){
-  .app{padding:9px;gap:8px}
-  .brand-txt{display:none}
-  .stage{padding:18px 16px 64px}
-  .bubble{max-width:96%;font-size:14.5px}
-  .narr{font-size:13.5px}
-  .tab{padding:7px 9px;font-size:12px}
+/* 舞台 */
+.game-stage{
+  position:relative;flex:1 1 auto;overflow:hidden;
+  display:flex;flex-direction:column;justify-content:flex-end;
+}
+.stage-bg{
+  position:absolute;inset:0;pointer-events:none;
+  background:
+    radial-gradient(circle at 50% 22%, rgba(232,106,72,.055), transparent 58%),
+    radial-gradient(circle at 12% 78%, rgba(74,111,165,.05), transparent 52%);
+}
+.portrait-zone{
+  position:absolute;left:50%;top:6%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;
+  z-index:1;
+}
+.portrait{
+  width:clamp(96px,26vw,150px);height:clamp(96px,26vw,150px);
+  border-radius:50%;
+  background:linear-gradient(145deg,#FFF0E4,#FFE0CE);
+  border:2px solid var(--paper);
+  box-shadow:0 10px 30px rgba(232,106,72,.20), inset 0 0 30px rgba(255,255,255,.7);
+  display:flex;align-items:center;justify-content:center;
+  font-size:clamp(2.4rem,9vw,3.6rem);
+  cursor:pointer;user-select:none;
+  transition:transform .25s cubic-bezier(.34,1.56,.64,1),box-shadow .25s ease;
+}
+[data-theme="dark"] .portrait{background:linear-gradient(145deg,#3A2A22,#2E211B);border-color:#3E322A;box-shadow:0 10px 30px rgba(0,0,0,.5);}
+.portrait:active{transform:scale(.93);}
+.portrait.pop{animation:portraitPop .4s cubic-bezier(.34,1.56,.64,1);}
+@keyframes portraitPop{0%{transform:scale(1);}45%{transform:scale(1.10) rotate(-3deg);}100%{transform:scale(1);}}
+.touch-bubble{
+  position:absolute;top:-6px;left:50%;transform:translate(-50%,-100%) scale(.85);
+  background:var(--paper);border:1px solid var(--line);
+  border-radius:14px;padding:8px 14px;
+  font-size:.8rem;line-height:1.55;white-space:nowrap;
+  box-shadow:var(--shadow);
+  opacity:0;pointer-events:none;
+  transition:opacity .28s ease,transform .28s cubic-bezier(.34,1.56,.64,1);
+  max-width:min(78vw,420px);white-space:normal;text-align:center;
+}
+.touch-bubble.show{opacity:1;transform:translate(-50%,-100%) scale(1);}
+
+/* 对话框 */
+.dialogue-outer{
+  position:relative;z-index:3;
+  padding:0 14px 14px;
+  padding-bottom:calc(14px + env(safe-area-inset-bottom));
+}
+.dialogue-box{
+  position:relative;
+  min-height:clamp(140px,26vh,220px);
+  background:rgba(255,255,255,.90);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow-lg);
+  padding:34px 22px 26px;
+  cursor:pointer;
+  transition:background .3s ease,border-color .3s ease;
+}
+[data-theme="dark"] .dialogue-box{background:rgba(42,37,34,.92);}
+.dialogue-box.narration{background:rgba(255,251,242,.86);}
+[data-theme="dark"] .dialogue-box.narration{background:rgba(35,31,28,.92);}
+.dialogue-box.inner .dialogue-text{
+  font-style:italic;color:var(--ink-soft);
+}
+.speaker-tag{
+  position:absolute;top:-15px;left:20px;
+  display:inline-flex;align-items:center;
+  padding:4px 16px;
+  border-radius:9px 9px 9px 2px;
+  background:linear-gradient(135deg,var(--cash),#D9553A);
+  color:#fff;font-size:.80rem;letter-spacing:.12em;
+  box-shadow:0 4px 14px rgba(232,106,72,.34);
+  max-width:70%;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.dialogue-box.inner .speaker-tag{background:linear-gradient(135deg,var(--mott),#3A5A8A);box-shadow:0 4px 14px rgba(74,111,165,.34);}
+.dialogue-text{
+  font-size:clamp(.95rem,3.7vw,1.06rem);
+  line-height:1.95;letter-spacing:.02em;
+  word-break:break-word;
+  min-height:2em;
+}
+.continue-hint{
+  position:absolute;right:18px;bottom:12px;
+  font-size:.8rem;color:var(--cash);opacity:0;
+  animation:bob 1.4s ease-in-out infinite;
+}
+.continue-hint.show{opacity:.85;}
+@keyframes bob{0%,100%{transform:translateY(0);}50%{transform:translateY(4px);}}
+
+/* 选项 */
+.choices{
+  position:absolute;inset:0;z-index:6;
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  gap:12px;padding:24px;
+  background:rgba(255,251,242,.72);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+}
+[data-theme="dark"] .choices{background:rgba(20,18,16,.72);}
+.choices.show{display:flex;animation:fadeIn .28s ease;}
+.choice-btn{
+  width:min(520px,92%);text-align:left;
+  padding:15px 22px;border-radius:999px;
+  background:var(--paper);
+  border:1.5px solid var(--line);
+  box-shadow:var(--shadow);
+  font-size:.95rem;line-height:1.6;letter-spacing:.03em;
+  transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease,background .2s ease;
+  animation:fadeIn .34s ease both;
+}
+.choice-btn:hover{
+  transform:translateY(-2px) scale(1.012);
+  border-color:var(--cash-soft);
+  box-shadow:0 8px 26px rgba(232,106,72,.26);
+  background:linear-gradient(135deg,var(--paper),#FFF6F0);
+}
+[data-theme="dark"] .choice-btn:hover{background:linear-gradient(135deg,#332C27,#3D2E26);}
+.choice-btn:active{transform:scale(.985);}
+.choice-btn:nth-child(1){animation-delay:.02s;}
+.choice-btn:nth-child(2){animation-delay:.07s;}
+.choice-btn:nth-child(3){animation-delay:.12s;}
+.choice-btn:nth-child(4){animation-delay:.17s;}
+.choice-btn:nth-child(5){animation-delay:.22s;}
+
+/* 底栏 */
+.game-bottom{
+  flex:0 0 auto;
+  display:flex;gap:6px;justify-content:center;
+  padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+  background:var(--bg2);
+  border-top:1px solid var(--line-soft);
+}
+.game-bottom .icon-btn{width:auto;padding:0 12px;font-size:.8rem;letter-spacing:.1em;font-family:var(--font-sans);}
+.game-bottom .icon-btn.on{color:var(--cash);background:var(--paper);}
+
+/* ============================================================================
+   4. 通用子页面
+   ============================================================================ */
+.sub-top{
+  flex:0 0 auto;display:flex;align-items:center;gap:12px;
+  padding:14px 16px;
+  padding-top:calc(14px + env(safe-area-inset-top));
+  background:var(--bg2);border-bottom:1px solid var(--line-soft);
+  position:sticky;top:0;z-index:20;
+}
+.sub-title{font-size:1rem;letter-spacing:.14em;font-weight:600;}
+.sub-title small{
+  display:block;font-size:.66rem;letter-spacing:.2em;
+  color:var(--ink-faint);font-weight:400;font-family:var(--font-sans);
+}
+.sub-body{
+  flex:1 1 auto;overflow-y:auto;
+  padding:18px 16px calc(40px + env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling:touch;
+}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
+.tab{
+  padding:7px 16px;border-radius:999px;font-size:.82rem;
+  border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);
+  transition:all .2s ease;font-family:var(--font-sans);
+}
+.tab:hover{border-color:var(--cash-soft);color:var(--cash);}
+.tab.active{background:linear-gradient(135deg,var(--cash),#D9553A);color:#fff;border-color:transparent;box-shadow:0 4px 14px rgba(232,106,72,.28);}
+
+/* 卡片网格 */
+.card-grid{display:grid;grid-template-columns:1fr;gap:14px;}
+@media(min-width:720px){.card-grid{grid-template-columns:1fr 1fr;}}
+@media(min-width:1100px){.card-grid{grid-template-columns:1fr 1fr 1fr;}}
+.card{
+  background:var(--paper);border:1px solid var(--line);
+  border-radius:14px;padding:16px 18px;
+  box-shadow:var(--shadow);
+  transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease;
+}
+.card.clickable{cursor:pointer;}
+.card.clickable:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);border-color:var(--cash-soft);}
+.card.locked{opacity:.62;filter:grayscale(.35);cursor:not-allowed;}
+.card.locked:hover{transform:none;box-shadow:var(--shadow);border-color:var(--line);}
+.card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px;}
+.card-title{font-size:.98rem;font-weight:600;letter-spacing:.04em;line-height:1.5;}
+.card-cat{
+  font-family:var(--font-sans);font-size:.66rem;padding:3px 9px;border-radius:8px;
+  background:var(--line-soft);color:var(--ink-soft);white-space:nowrap;flex:0 0 auto;
+}
+.card-desc{font-size:.85rem;color:var(--ink-soft);line-height:1.8;}
+.card-lock{
+  margin-top:10px;font-family:var(--font-sans);font-size:.72rem;
+  color:var(--ink-faint);display:flex;align-items:center;gap:6px;
+}
+.card-answer{
+  margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);
+  font-size:.90rem;line-height:1.9;color:var(--ink);
+  animation:fadeIn .3s ease;
+}
+.card-answer .ans-label{
+  font-family:var(--font-sans);font-size:.68rem;letter-spacing:.18em;
+  color:var(--cash);display:block;margin-bottom:6px;
+}
+.empty-tip{
+  text-align:center;padding:56px 20px;color:var(--ink-faint);
+  font-size:.86rem;line-height:2;font-family:var(--font-sans);
+}
+.empty-tip .big{font-size:2rem;display:block;margin-bottom:12px;opacity:.5;}
+
+/* 搜索 */
+.search-bar{
+  display:flex;align-items:center;gap:8px;
+  background:var(--paper);border:1px solid var(--line);border-radius:999px;
+  padding:8px 16px;margin-bottom:16px;
+}
+.search-bar input{
+  flex:1;border:none;background:transparent;outline:none;font-size:.86rem;
+}
+.search-bar .ico{color:var(--ink-faint);font-size:.9rem;}
+
+/* 人际关系网 */
+.rel-graph{
+  position:relative;display:flex;flex-wrap:wrap;gap:14px;justify-content:center;
+  padding:10px 0 24px;
+}
+.rel-node{
+  position:relative;
+  width:min(260px,44%);
+  min-width:150px;
+  background:var(--paper);border:1px solid var(--line);
+  border-radius:14px;padding:14px;text-align:center;
+  box-shadow:var(--shadow);
+  transition:transform .2s ease,box-shadow .2s ease;
+}
+@media(max-width:520px){.rel-node{width:100%;}}
+.rel-node:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);}
+.rel-node .avatar{
+  width:46px;height:46px;border-radius:50%;margin:0 auto 8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.4rem;
+  background:linear-gradient(135deg,var(--gold),var(--cash));
+  color:#fff;
+}
+.rel-node .rname{font-size:.92rem;font-weight:600;letter-spacing:.06em;}
+.rel-node .rrole{font-size:.72rem;color:var(--cash);font-family:var(--font-sans);margin-bottom:6px;}
+.rel-node .rdesc{font-size:.79rem;color:var(--ink-soft);line-height:1.75;}
+
+/* ============================================================================
+   5. 代码工坊
+   ============================================================================ */
+.ws-panel{
+  background:var(--paper);border:1px solid var(--line);border-radius:16px;
+  padding:18px;box-shadow:var(--shadow);margin-bottom:18px;
+}
+.ws-label{
+  font-family:var(--font-sans);font-size:.72rem;letter-spacing:.2em;
+  color:var(--ink-soft);margin-bottom:10px;display:block;
+}
+.ws-textarea{
+  width:100%;min-height:280px;
+  background:#26211D;color:#E8DCC8;
+  border:1px solid #3B342D;border-radius:12px;
+  padding:14px 16px;
+  font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  font-size:.80rem;line-height:1.75;
+  resize:vertical;outline:none;
+  transition:border-color .2s ease;
+  tab-size:2;
+}
+.ws-textarea:focus{border-color:var(--cash);box-shadow:0 0 0 3px rgba(232,106,72,.14);}
+.ws-textarea::placeholder{color:#6B6055;}
+.ws-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;}
+.ws-log{
+  margin-top:14px;padding:12px 16px;border-radius:12px;
+  font-family:var(--font-sans);font-size:.78rem;line-height:1.85;
+  display:none;
+}
+.ws-log.show{display:block;animation:fadeIn .25s ease;}
+.ws-log.ok{background:#EAF6EC;border:1px solid #BFE3C6;color:#2E6B3A;}
+.ws-log.err{background:#FDECEC;border:1px solid #F3C2C2;color:#A33A3A;}
+.ws-log.warn{background:#FFF6E3;border:1px solid #F2DCA8;color:#8A6A2E;}
+[data-theme="dark"] .ws-log.ok{background:#20301F;border-color:#38553A;color:#9ED8A6;}
+[data-theme="dark"] .ws-log.err{background:#331E1E;border-color:#5A3030;color:#EFA0A0;}
+[data-theme="dark"] .ws-log.warn{background:#332B1A;border-color:#5A4A26;color:#E0C48A;}
+.ws-log ul{margin-left:18px;}
+.ws-log li{margin:2px 0;}
+
+/* ============================================================================
+   6. 弹层 / Toast / 特效
+   ============================================================================ */
+#toastWrap{
+  position:fixed;left:50%;top:22px;transform:translateX(-50%);
+  z-index:9000;display:flex;flex-direction:column;gap:8px;
+  pointer-events:none;align-items:center;
+}
+.toast{
+  background:var(--paper);border:1px solid var(--line);
+  border-left:4px solid var(--cash);
+  border-radius:10px;padding:10px 20px;
+  font-family:var(--font-sans);font-size:.80rem;letter-spacing:.04em;
+  box-shadow:var(--shadow-lg);
+  animation:toastIn .3s cubic-bezier(.34,1.56,.64,1);
+  max-width:88vw;text-align:center;
+}
+.toast.ok{border-left-color:#5BB36B;}
+.toast.err{border-left-color:#D9534F;}
+.toast.warn{border-left-color:var(--gold);}
+.toast.out{animation:toastOut .35s ease forwards;}
+@keyframes toastIn{from{opacity:0;transform:translateY(-14px) scale(.94);}to{opacity:1;transform:none;}}
+@keyframes toastOut{to{opacity:0;transform:translateY(-10px) scale(.96);}}
+
+#affPopWrap{
+  position:fixed;right:18px;top:72px;z-index:9100;
+  display:flex;flex-direction:column;gap:6px;align-items:flex-end;
+  pointer-events:none;
+}
+.aff-pop{
+  font-family:var(--font-sans);font-weight:700;font-size:.92rem;
+  padding:5px 14px;border-radius:999px;
+  letter-spacing:.06em;
+  animation:affFloat 1.5s ease forwards;
+  box-shadow:0 4px 14px rgba(0,0,0,.10);
+}
+.aff-pop.up{color:#C24A2C;background:rgba(255,235,228,.95);border:1px solid #F5C0AC;}
+.aff-pop.down{color:#4A6FA5;background:rgba(232,240,250,.95);border:1px solid #B4CBE6;}
+[data-theme="dark"] .aff-pop.up{background:rgba(70,38,28,.95);border-color:#7A4632;color:#FFB69A;}
+[data-theme="dark"] .aff-pop.down{background:rgba(32,44,62,.95);border-color:#3E5A7E;color:#A8C0DE;}
+@keyframes affFloat{
+  0%{opacity:0;transform:translateY(14px) rotate(-4deg) scale(.85);}
+  18%{opacity:1;transform:translateY(0) rotate(2deg) scale(1.06);}
+  30%{transform:translateY(-3px) rotate(-1deg) scale(1);}
+  100%{opacity:0;transform:translateY(-52px) rotate(3deg) scale(.95);}
+}
+
+/* 好感度升级全屏特效 */
+#levelUpWrap{
+  position:fixed;inset:0;z-index:9500;
+  display:flex;align-items:center;justify-content:center;
+  pointer-events:none;opacity:0;transition:opacity .4s ease;
+  background:radial-gradient(circle at 50% 50%,rgba(242,193,78,.28),rgba(232,106,72,.10) 45%,transparent 72%);
+}
+#levelUpWrap.show{opacity:1;}
+.lu-card{
+  text-align:center;
+  animation:luIn .8s cubic-bezier(.2,1.2,.4,1) both;
+}
+.lu-small{
+  font-family:var(--font-sans);font-size:.74rem;letter-spacing:.5em;
+  color:var(--cash);margin-bottom:14px;text-indent:.5em;
+}
+.lu-name{
+  font-size:clamp(2rem,9vw,3.4rem);font-weight:600;letter-spacing:.14em;
+  background:linear-gradient(135deg,var(--gold),var(--cash));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:0 0 40px rgba(242,193,78,.4);
+}
+.lu-num{
+  margin-top:10px;font-family:var(--font-sans);font-size:.9rem;
+  letter-spacing:.3em;color:var(--ink-soft);
+}
+@keyframes luIn{from{opacity:0;transform:scale(.72) translateY(20px);}to{opacity:1;transform:none;}}
+
+/* 模态框 */
+#modalWrap{
+  position:fixed;inset:0;z-index:9200;
+  display:none;align-items:center;justify-content:center;
+  background:rgba(58,50,44,.42);backdrop-filter:blur(4px);
+  padding:20px;
+}
+#modalWrap.show{display:flex;animation:fadeIn .24s ease;}
+.modal{
+  background:var(--paper);border:1px solid var(--line);
+  border-radius:18px;box-shadow:var(--shadow-lg);
+  width:min(520px,94vw);max-height:86vh;display:flex;flex-direction:column;
+  animation:modalIn .34s cubic-bezier(.34,1.4,.64,1);
+}
+@keyframes modalIn{from{opacity:0;transform:translateY(22px) scale(.96);}to{opacity:1;transform:none;}}
+.modal-head{
+  padding:18px 22px 12px;border-bottom:1px solid var(--line-soft);
+  font-size:1rem;letter-spacing:.12em;font-weight:600;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+.modal-body{
+  padding:18px 22px;overflow-y:auto;flex:1 1 auto;
+  font-size:.88rem;line-height:1.9;
+}
+.modal-foot{
+  padding:12px 22px 18px;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;
+  border-top:1px solid var(--line-soft);
+}
+
+/* 设置项 */
+.set-row{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:11px 0;border-bottom:1px dashed var(--line-soft);
+}
+.set-row:last-child{border-bottom:none;}
+.set-name{font-size:.86rem;}
+.set-name small{display:block;font-size:.68rem;color:var(--ink-faint);font-family:var(--font-sans);}
+.switch{
+  position:relative;width:46px;height:26px;border-radius:999px;
+  background:var(--line);transition:background .25s ease;flex:0 0 auto;
+}
+.switch.on{background:linear-gradient(135deg,var(--gold),var(--cash));}
+.switch::after{
+  content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;
+  border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.2);
+  transition:transform .25s cubic-bezier(.34,1.4,.64,1);
+}
+.switch.on::after{transform:translateX(20px);}
+input[type=range]{
+  -webkit-appearance:none;appearance:none;
+  width:130px;height:6px;border-radius:6px;
+  background:var(--line);outline:none;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+  background:var(--cash);cursor:pointer;box-shadow:0 2px 8px rgba(232,106,72,.4);
+}
+input[type=range]::-moz-range-thumb{
+  width:18px;height:18px;border:none;border-radius:50%;
+  background:var(--cash);cursor:pointer;
+}
+
+/* 存档槽 */
+.slot{
+  display:flex;align-items:center;gap:14px;
+  padding:14px 16px;border-radius:14px;
+  background:var(--paper);border:1px solid var(--line);
+  margin-bottom:10px;transition:all .2s ease;
+}
+.slot:hover{border-color:var(--cash-soft);transform:translateX(3px);}
+.slot-idx{
+  width:34px;height:34px;border-radius:10px;flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--gold),var(--cash));
+  color:#fff;font-family:var(--font-sans);font-weight:700;font-size:.86rem;
+}
+.slot-info{flex:1 1 auto;min-width:0;}
+.slot-title{font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.slot-meta{font-size:.70rem;color:var(--ink-faint);font-family:var(--font-sans);}
+.slot-actions{display:flex;gap:6px;flex:0 0 auto;}
+
+/* 历史记录条目 */
+.hist-item{padding:10px 0;border-bottom:1px dashed var(--line-soft);}
+.hist-item:last-child{border-bottom:none;}
+.hist-who{
+  font-family:var(--font-sans);font-size:.68rem;letter-spacing:.14em;
+  color:var(--cash);margin-bottom:3px;
+}
+.hist-item.inner .hist-who{color:var(--mott);}
+.hist-text{font-size:.86rem;line-height:1.85;color:var(--ink);}
+.hist-item.inner .hist-text{font-style:italic;color:var(--ink-soft);}
+.hist-item.narration .hist-text{color:var(--ink-soft);}
+
+/* 成就 */
+.ach-item{
+  display:flex;align-items:center;gap:14px;padding:13px 16px;
+  border-radius:14px;background:var(--paper);border:1px solid var(--line);
+  margin-bottom:10px;transition:all .2s ease;
+}
+.ach-item.locked{opacity:.5;filter:grayscale(.6);}
+.ach-icon{
+  width:40px;height:40px;border-radius:12px;flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;font-size:1.25rem;
+  background:linear-gradient(135deg,var(--gold),var(--cash));color:#fff;
+}
+.ach-item.locked .ach-icon{background:var(--line);color:var(--ink-faint);}
+.ach-t{font-size:.88rem;font-weight:600;}
+.ach-d{font-size:.72rem;color:var(--ink-faint);font-family:var(--font-sans);}
+
+@media(max-width:520px){
+  .home-inner{padding:34px 18px 28px;}
+  .dialogue-outer{padding:0 10px 10px;}
+  .dialogue-box{padding:30px 16px 22px;}
+  .sub-body{padding:14px 12px calc(36px + env(safe-area-inset-bottom));}
 }
 </style>
 </head>
 <body>
+<div id="app">
 
-<div class="deco"><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span></div>
-
-<div class="app">
-  <header class="topbar">
-    <div class="brand">
-      <span class="mark"></span>
-      <div class="brand-txt"><b>合租事故</b><i>co-habitation incident</i></div>
+  <!-- ================= 主页 ================= -->
+  <section class="page active" id="page-home">
+    <div class="home-deco">
+      <svg class="fox" viewBox="0 0 120 120">
+        <path d="M22 40 L14 12 L40 26 L60 22 L80 26 L106 12 L98 40 L100 62 Q100 96 60 106 Q20 96 20 62 Z"/>
+        <path d="M42 58 q6 -8 12 0" fill="none" stroke="#FFF" stroke-width="3"/>
+        <path d="M66 58 q6 -8 12 0" fill="none" stroke="#FFF" stroke-width="3"/>
+      </svg>
+      <svg class="staff" viewBox="0 0 200 120">
+        <circle cx="16" cy="16" r="7"/><circle cx="16" cy="40" r="7"/><circle cx="16" cy="64" r="7"/>
+        <circle cx="16" cy="88" r="7"/><circle cx="16" cy="112" r="7"/>
+        <path d="M16 16 H190 M16 40 H190 M16 64 H190 M16 88 H190 M16 112 H190" stroke="currentColor" stroke-width="3" fill="none"/>
+      </svg>
+      <div class="dot" style="left:12%;top:22%;width:9px;height:9px;background:var(--cash);opacity:.35;animation-delay:0s"></div>
+      <div class="dot" style="left:78%;top:16%;width:6px;height:6px;background:var(--gold);opacity:.45;animation-delay:1.4s"></div>
+      <div class="dot" style="left:88%;top:62%;width:11px;height:11px;background:var(--mott);opacity:.24;animation-delay:2.8s"></div>
+      <div class="dot" style="left:22%;top:74%;width:7px;height:7px;background:var(--cash);opacity:.30;animation-delay:3.6s"></div>
     </div>
-    <nav class="tabs">
-      <button class="tab is-on" data-view="story">故事</button>
-      <button class="tab" data-view="chapters">章节</button>
-      <button class="tab" data-view="endings">结局</button>
-      <button class="tab" data-view="status">状态</button>
-      <button class="tab" data-view="recap">回顾</button>
-      <button class="tab" data-view="workshop">工坊</button>
-    </nav>
-  </header>
 
-  <main class="views">
+    <div class="home-inner fade-in">
+      <div class="home-sub">BL · 情景恋爱喜剧</div>
+      <h1 class="home-title">和室友恋爱的<br>错误示范</h1>
+      <div class="home-tagline">—— 我们只是室友，对吧？</div>
 
-    <section class="view is-on" id="v-story">
-      <div class="hud" id="hud"></div>
-      <div class="stage" id="stage"></div>
-      <div class="choices" id="choices"></div>
-      <div class="tools">
-        <button id="btnBack">◀ 回退</button>
-        <button id="btnAuto">▷ 自动</button>
-        <button id="btnRestart">↻ 重来</button>
-        <button id="btnMenu">☰ 目录</button>
+      <div id="integrityBanner"></div>
+
+      <div class="home-actions">
+        <button class="btn btn-primary" id="btnStart">开 始 游 戏</button>
+        <button class="btn" id="btnContinue">继 续 剧 情</button>
+        <button class="btn" id="btnQna">羁 绊 问 答</button>
+        <button class="btn" id="btnInfo">角 色 档 案</button>
+        <button class="btn" id="btnSide">彩 蛋 副 本</button>
+        <button class="btn" id="btnWorkshop">代 码 工 坊</button>
       </div>
-    </section>
 
-    <section class="view" id="v-chapters">
-      <div class="panel">
-        <h2 class="p-title">章节目录</h2>
-        <p class="p-sub">已注册的章节会出现在这里。在「工坊」里重新导入同一 id 的章节即可覆盖更新。</p>
-        <div class="ch-list" id="chList"></div>
+      <div class="home-foot">
+        <button class="mini" id="btnSlots">存档</button>
+        <button class="mini" id="btnShare">分享</button>
+        <button class="mini" id="btnImport">导入</button>
+        <button class="mini" id="btnSettings">设置</button>
       </div>
-    </section>
 
-    <section class="view" id="v-endings">
-      <div class="panel">
-        <h2 class="p-title">结局收集</h2>
-        <p class="p-sub" id="edCount"></p>
-        <div class="ed-grid" id="edGrid"></div>
+      <div class="home-version">ENGINE v1.0 · 数据驱动 · 本地存档</div>
+    </div>
+  </section>
+
+  <!-- ================= 游戏页 ================= -->
+  <section class="page" id="page-game">
+    <header class="game-top">
+      <button class="icon-btn" id="gBtnBack" title="返回主页">←</button>
+      <div class="chapter-title" id="gChapterTitle">第一章 · 错误的开始</div>
+      <div class="aff-wrap">
+        <span class="aff-level-tag" id="gAffLevel">陌生人</span>
+        <div class="aff-track"><div class="aff-fill" id="gAffFill"></div></div>
+        <span class="aff-num" id="gAffNum">1</span>
       </div>
-    </section>
+      <button class="icon-btn" id="gBtnSettings" title="设置">⚙</button>
+    </header>
 
-    <section class="view" id="v-status">
-      <div class="panel">
-        <h2 class="p-title">当前状态</h2>
-        <p class="p-sub">好感度、驯化度、暴躁值会随着你的每一次选择变化。它们会悄悄影响卡什对你的态度。</p>
-        <div id="stRows"></div>
+    <main class="game-stage" id="gameStage">
+      <div class="stage-bg"></div>
+
+      <div class="portrait-zone">
+        <div class="portrait" id="gPortrait" title="点一下试试">🦊</div>
+        <div class="touch-bubble" id="gBubble"></div>
       </div>
-    </section>
 
-    <section class="view" id="v-recap">
-      <div class="panel">
-        <h2 class="p-title">已读回顾</h2>
-        <p class="p-sub">这里按顺序记录了你这一周目读过的全部内容。回退时也会同步回退。</p>
-        <div id="recapBox"></div>
-      </div>
-    </section>
+      <div class="choices" id="gChoices"></div>
 
-    <section class="view" id="v-workshop">
-      <div class="panel">
-        <h2 class="p-title">工坊 · 导入章节</h2>
-        <p class="p-sub">
-          把章节代码粘贴进来，点「应用 / 覆盖」。同一 id 会覆盖旧版本 —— 修改过的旧章节也可以直接重新导入覆盖。
-          支持一次粘贴多个 <code>Game.defineChapter({...})</code>。
-        </p>
-        <textarea class="ta" id="code" spellcheck="false" placeholder="Game.defineChapter({
-  id: 'ch02',
-  order: 2,
-  title: '第二章 · …',
-  subtitle: '副标题',
-  start: 'a',
-  endings: { e_ch2: { name: '第二章 · 完', desc: '…' } },
-  nodes: {
-    a: {
-      steps: [
-        { t:'scene', x:'场景一 · 名字' },
-        { t:'n', x:'旁白。' },
-        { t:'s', who:'卡什', x:'English line.', cn:'（中文翻译。）' },
-        { t:'c', x:'【做出选择】', o:[
-          { l:'选项 A', to:'b', fx:{ aff:5, dom:0, irr:-5 } },
-          { l:'选项 B', to:'c', fx:{ aff:10, dom:5, irr:-5 } }
-        ]}
-      ]
-    },
-    b: { steps:[{ t:'n', x:'分支 B。' }], next:'a' },
-    c: { steps:[{ t:'n', x:'分支 C。' },{ t:'end', id:'e_ch2' }] }
-  }
-});"></textarea>
-        <div class="btn-row">
-          <button class="btn primary" id="btnApply">应用 / 覆盖</button>
-          <button class="btn" id="btnTpl">插入模板</button>
-          <button class="btn" id="btnClearCode">清空</button>
+      <div class="dialogue-outer">
+        <div class="dialogue-box" id="gBox">
+          <div class="speaker-tag" id="gSpeaker">卡什</div>
+          <div class="dialogue-text" id="gText"></div>
+          <div class="continue-hint" id="gHint">▼</div>
         </div>
-        <div class="msg" id="codeMsg"></div>
       </div>
-    </section>
+    </main>
 
-  </main>
+    <footer class="game-bottom">
+      <button class="icon-btn" id="gBtnHistory">历史</button>
+      <button class="icon-btn" id="gBtnAuto">自动</button>
+      <button class="icon-btn" id="gBtnSkip">跳过</button>
+      <button class="icon-btn" id="gBtnSave">存档</button>
+    </footer>
+  </section>
+
+  <!-- ================= 羁绊问答 ================= -->
+  <section class="page" id="page-qna">
+    <header class="sub-top">
+      <button class="icon-btn" data-back>←</button>
+      <div class="sub-title">羁绊问答<small>BOND Q &amp; A</small></div>
+    </header>
+    <div class="sub-body">
+      <div class="search-bar">
+        <span class="ico">🔍</span>
+        <input type="text" id="qnaSearch" placeholder="搜索问题或回答…">
+      </div>
+      <div class="tabs" id="qnaTabs"></div>
+      <div class="card-grid" id="qnaList"></div>
+    </div>
+  </section>
+
+  <!-- ================= 角色档案 ================= -->
+  <section class="page" id="page-info">
+    <header class="sub-top">
+      <button class="icon-btn" data-back>←</button>
+      <div class="sub-title">角色档案<small>CHARACTER FILES</small></div>
+    </header>
+    <div class="sub-body">
+      <div class="tabs" id="infoTabs">
+        <button class="tab active" data-itab="cash">卡什档案</button>
+        <button class="tab" data-itab="items">卡什的东西</button>
+        <button class="tab" data-itab="rel">人际关系</button>
+        <button class="tab" data-itab="mott">我的信息</button>
+        <button class="tab" data-itab="ach">成就</button>
+      </div>
+      <div id="infoBody"></div>
+    </div>
+  </section>
+
+  <!-- ================= 彩蛋副本 ================= -->
+  <section class="page" id="page-side">
+    <header class="sub-top">
+      <button class="icon-btn" data-back>←</button>
+      <div class="sub-title">彩蛋副本<small>SIDE STORIES</small></div>
+    </header>
+    <div class="sub-body">
+      <div class="empty-tip" style="padding:8px 20px 20px;font-size:.76rem;">
+        副本存档与主线完全独立，游玩不会影响主线进度。
+      </div>
+      <div class="card-grid" id="sideList"></div>
+    </div>
+  </section>
+
+  <!-- ================= 代码工坊 ================= -->
+  <section class="page" id="page-workshop">
+    <header class="sub-top">
+      <button class="icon-btn" data-back>←</button>
+      <div class="sub-title">代码工坊<small>CONTENT WORKSHOP</small></div>
+    </header>
+    <div class="sub-body">
+      <div class="tabs" id="wsTabs"></div>
+
+      <div class="ws-panel">
+        <label class="ws-label" id="wsHint">粘贴 JSON（单个对象或对象数组均可）</label>
+        <textarea class="ws-textarea" id="wsInput" spellcheck="false"
+          placeholder='{
+  "type": "chapter",
+  "id": "ch02",
+  "title": "第二章 · ……",
+  "order": 2,
+  "beats": [ ... ]
+}'></textarea>
+        <div class="ws-actions">
+          <button class="btn btn-primary sm" id="wsImport">校验并导入</button>
+          <button class="btn sm" id="wsFormat">格式化</button>
+          <button class="btn sm" id="wsTemplate">插入模板</button>
+          <button class="btn sm" id="wsClear">清空</button>
+        </div>
+        <div class="ws-log" id="wsLog"></div>
+      </div>
+
+      <div class="ws-panel">
+        <label class="ws-label">数据总览</label>
+        <div id="wsStats" style="font-family:var(--font-sans);font-size:.80rem;line-height:2;color:var(--ink-soft);"></div>
+        <div class="ws-actions">
+          <button class="btn sm" id="wsExportAll">导出全部数据 + 存档</button>
+          <button class="btn sm" id="wsExportRaw">导出纯内容库</button>
+          <button class="btn sm" id="wsImportFile">从文件导入</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
 </div>
 
-<div class="overlay" id="ov">
-  <div class="ov-card">
-    <div class="ov-tag" id="ovTag">ENDING</div>
-    <h3 id="ovTitle">结局</h3>
-    <p id="ovDesc"></p>
-    <button class="btn primary" id="ovNext" style="display:none">▶ 继续下一章</button>
-<button class="btn" id="ovRewind">◀ 回到刚才的选择</button>
-<button class="btn" id="ovRestart">↻ 重玩本章</button>
-<button class="btn" id="ovClose">继续停留在此</button>
-  </div>
-</div>
+<!-- ================= 浮层 ================= -->
+<div id="toastWrap"></div>
+<div id="affPopWrap"></div>
+<div id="levelUpWrap"></div>
+<div id="modalWrap"><div class="modal" id="modalBox"></div></div>
 
 <script>
 (function(){
 'use strict';
 
-/* ══════════════════ 工具 ══════════════════ */
-const $  = s => document.querySelector(s);
-const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const clone = o => JSON.parse(JSON.stringify(o));
+/* ============================================================================
+   ============================  PART 0 · 工具函数  ============================
+   ============================================================================ */
+const $  = (s, r) => (r||document).querySelector(s);
+const $$ = (s, r) => Array.prototype.slice.call((r||document).querySelectorAll(s));
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => (
+  {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+));
+const nowISO = () => new Date().toISOString();
+const pad2 = n => (n<10?'0':'') + n;
+function fmtDate(ts){
+  if(!ts) return '——';
+  const d = new Date(ts);
+  return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())+' '+
+         pad2(d.getHours())+':'+pad2(d.getMinutes());
+}
+function dateKey(){
+  const d = new Date();
+  return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
+}
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
 
-/* ══════════════════ 属性定义 ══════════════════ */
-const ATTR_DEF = {
-  aff: { label:'好感度', init:30, max:100, color:'#C0A062' },
-  dom: { label:'驯化度', init:10, max:100, color:'#4A6C8C' },
-  irr: { label:'暴躁值', init:80, max:100, color:'#B5675A' }
+/** Toast 提示 */
+function toast(msg, type){
+  const wrap = $('#toastWrap');
+  const el = document.createElement('div');
+  el.className = 'toast' + (type ? ' '+type : '');
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(()=>{
+    el.classList.add('out');
+    setTimeout(()=>el.remove(), 380);
+  }, 2500);
+}
+
+/** 下载文本文件 */
+function download(filename, text){
+  const blob = new Blob([text], {type:'application/json;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 1500);
+}
+
+/* ============================================================================
+   ============================  PART 1 · 存储层  =============================
+   ============================================================================ */
+/** localStorage key 约定 —— 所有 key 集中在这里，方便维护 */
+const K = {
+  main:        'hzy_save_main',
+  slots:       ['hzy_save_slots_1','hzy_save_slots_2','hzy_save_slots_3'],
+  chapters:    'hzy_data_chapters',
+  qna:         'hzy_data_qna',
+  charinfo:    'hzy_data_charinfo',
+  relations:   'hzy_data_relations',
+  sides:       'hzy_data_sides',
+  levels:      'hzy_data_affection_levels',
+  config:      'hzy_config',
+  achievements:'hzy_achievements',
+  daily:       'hzy_daily'
 };
-const WHO_COLORS = { '你':'#4A6C8C', '小桁':'#4A6C8C', '莫桁':'#4A6C8C', '卡什':'#9E7F42', '卡什·洛克威尔':'#9E7F42' };
-const whoColor = w => WHO_COLORS[w] || '#6E7A86';
+const sideSaveKey = id => 'hzy_save_side_' + id;
 
-/* ══════════════════ 全局 Game 对象 ══════════════════ */
-const Game = {
-  chapters: {},
-  order: [],
-  endings: {},
-  _listeners: [],
-  on(fn){ Game._listeners.push(fn); },
-  _emit(){ Game._listeners.forEach(f => { try{ f(); }catch(e){} }); },
-
-  defineChapter(def){
-    if(!def || !def.id) throw new Error('章节定义缺少 id 字段');
-    if(!def.nodes || !def.start) throw new Error('章节 ' + def.id + ' 缺少 nodes 或 start');
-    if(!Game.chapters[def.id]) Game.order.push(def.id);
-    Game.chapters[def.id] = def;
-
-    Object.keys(Game.endings).forEach(id => {
-      if(Game.endings[id].chapter === def.id) delete Game.endings[id];
-    });
-    if(def.endings){
-      Object.keys(def.endings).forEach(k => {
-        Game.endings[k] = Object.assign({ chapter: def.id, id: k }, def.endings[k]);
-      });
+/** 安全的 localStorage 读写封装 */
+const store = {
+  get(key, def){
+    try{
+      const raw = localStorage.getItem(key);
+      if (raw === null || raw === undefined) return def;
+      return JSON.parse(raw);
+    }catch(e){
+      console.warn('[store] 读取失败:', key, e);
+      return def;
     }
-
-    Game.order.sort((a, b) => {
-      const A = Game.chapters[a], B = Game.chapters[b];
-      return (A.order == null ? 9999 : A.order) - (B.order == null ? 9999 : B.order);
-    });
-
-    Game._emit();
   },
-
-  removeChapter(id){
-    delete Game.chapters[id];
-    Game.order = Game.order.filter(x => x !== id);
-    Object.keys(Game.endings).forEach(k => {
-      if(Game.endings[k].chapter === id) delete Game.endings[k];
-    });
-    Game._emit();
-  }
-};
-window.Game = Game;
-
-/* ══════════════════ 存档 ══════════════════ */
-const SAVE_KEY = 'hzsc_save_v1';
-const END_KEY  = 'hzsc_endings_v1';
-
-let unlockedEndings = new Set();
-try{
-  const raw = localStorage.getItem(END_KEY);
-  if(raw) unlockedEndings = new Set(JSON.parse(raw));
-}catch(e){}
-function persistEndings(){
-  try{ localStorage.setItem(END_KEY, JSON.stringify([...unlockedEndings])); }catch(e){}
-}
-
-/* ══════════════════ 运行时状态 ══════════════════ */
-const S = {
-  chId:null, node:null, idx:0,
-  attrs:{}, flags:{}, log:[],
-  awaiting:false, ended:false
-};
-let history = [];
-let autoTimer = null;
-
-function freshAttrs(){
-  const o = {};
-  for(const k in ATTR_DEF) o[k] = ATTR_DEF[k].init;
-  return o;
-}
-function clamp(k, v){
-  const d = ATTR_DEF[k];
-  if(!d) return v;
-  return Math.max(0, Math.min(d.max, v));
-}
-function applyFx(fx){
-  if(!fx) return;
-  for(const k in fx){
-    if(!(k in ATTR_DEF)) continue;
-    const before = S.attrs[k] ?? ATTR_DEF[k].init;
-    S.attrs[k] = clamp(k, before + fx[k]);
-    if(S.attrs[k] !== before){
-      const chip = document.querySelector('.chip[data-k="' + k + '"]');
-      if(chip){ chip.classList.remove('bump'); void chip.offsetWidth; chip.classList.add('bump'); }
+  set(key, val){
+    try{
+      localStorage.setItem(key, JSON.stringify(val));
+      return true;
+    }catch(e){
+      console.warn('[store] 写入失败:', key, e);
+      toast('本地存储写入失败（可能空间已满）', 'err');
+      return false;
     }
+  },
+  del(key){ try{ localStorage.removeItem(key); }catch(e){} }
+};
+
+/* ============================================================================
+   =========================  PART 2 · 默认数据  ==============================
+   ============================================================================ */
+
+/** 默认好感度等级表（可被代码工坊覆盖） */
+const DEFAULT_LEVELS = [
+  { min:1,   max:9,   name:'陌生人' },
+  { min:10,  max:19,  name:'点头之交' },
+  { min:20,  max:29,  name:'室友' },
+  { min:30,  max:39,  name:'损友' },
+  { min:40,  max:49,  name:'有点意思' },
+  { min:50,  max:59,  name:'暧昧' },
+  { min:60,  max:69,  name:'心动' },
+  { min:70,  max:79,  name:'恋人未满' },
+  { min:80,  max:89,  name:'热恋' },
+  { min:90,  max:99,  name:'唯一' },
+  { min:100, max:100, name:'灵魂烙印' }
+];
+
+/** 默认成就 */
+const DEFAULT_ACHIEVEMENTS = [
+  { id:'ach_10',  unlock:10,  icon:'🍻', title:'第一个损友',   desc:'好感度达到 10' },
+  { id:'ach_20',  unlock:20,  icon:'🔑', title:'室友的钥匙',   desc:'好感度达到 20' },
+  { id:'ach_30',  unlock:30,  icon:'🃏', title:'嘴欠同盟',     desc:'好感度达到 30' },
+  { id:'ach_50',  unlock:50,  icon:'🤝', title:'第一次靠肩',   desc:'好感度达到 50' },
+  { id:'ach_70',  unlock:70,  icon:'🌙', title:'凌晨三点的电话', desc:'好感度达到 70' },
+  { id:'ach_90',  unlock:90,  icon:'🔥', title:'他唯一的例外', desc:'好感度达到 90' },
+  { id:'ach_100', unlock:100, icon:'💠', title:'灵魂烙印',     desc:'好感度达到 100' }
+];
+
+/** 默认 UI 配置 */
+const DEFAULT_CONFIG = {
+  typewriter: true,
+  speed: 28,          // 每字毫秒
+  sound: true,
+  dark: false,
+  fontScale: 1,
+  crt: false,
+  showLevelUp: true
+};
+
+/* ---------------------------------------------------------------------------
+   第一章测试剧情
+   --------------------------------------------------------------------------- */
+const DEFAULT_CH01 = {
+  type:'chapter',
+  id:'ch01',
+  title:'第一章 · 错误的开始',
+  order:1,
+  author:'官方',
+  beats:[
+    { id:'b1', type:'narration',
+      text:'九月的最后一个下午，你把最后一个纸箱搬进这间城东的合租公寓。' },
+    { id:'b2', type:'narration',
+      text:'房东阿姨一边数钥匙一边叹气：「这房子本来是洛克威尔家的。唉，少爷也得跟人合租喽。」' },
+    { id:'b3', type:'inner', speaker:'小桁',
+      text:'（洛克威尔。就是那个三个月内市值蒸发七成、上过财经新闻头版的洛克威尔。）' },
+    { id:'b4', type:'inner', speaker:'小桁',
+      text:'（而我，现在是他们家少爷的室友。人生的荒谬感，来得比预想中早。）' },
+    { id:'b5', type:'narration',
+      text:'门锁「咔哒」一声转动。' },
+    { id:'b6', type:'narration',
+      text:'一头金发先撞进视野——阳光似的，晃得你眯了眯眼。鼻梁上还架着一副墨镜。半永久的那种。' },
+    { id:'b7', type:'dialogue', speaker:'卡什',
+      text:'「Yo. So you\'re the roommate.」——哟，你就是我室友。' },
+    { id:'b8', type:'dialogue', speaker:'卡什',
+      text:'「Damn, nobody told me you\'d be this... compact.」——靠，没人告诉我你这么……迷你。' },
+    { id:'b9', type:'inner', speaker:'小桁',
+      text:'（他在室内戴墨镜。室内。九月下午四点。）' },
+    { id:'b10', type:'choice', prompt:'你要怎么回应？',
+      options:[
+        { text:'「我是小桁。你的翻译，兼职室友。」', affection:3,  next:'b11a' },
+        { text:'「墨镜摘了。屋里没太阳。」',         affection:5,  next:'b11b' },
+        { text:'沉默，把箱子搬进自己房间。',         affection:-2, next:'b11c' }
+      ]},
+    { id:'b11a', type:'dialogue', speaker:'卡什', next:'b12',
+      text:'「翻译？Nice, I need someone to order food for me.」——翻译？好啊，我需要有人帮我点外卖。' },
+    { id:'b11b', type:'dialogue', speaker:'卡什', affection:2, next:'b12',
+      text:'「……」他把墨镜往下推了一毫米，露出一线蓝，又飞快推回去。「It\'s a style thing, alright?」——这是造型，懂？' },
+    { id:'b11c', type:'narration', next:'b12',
+      text:'他没拦你。只是在背后吹了声口哨，懒洋洋的，像在逗一只不领情的猫。' },
+    { id:'b12', type:'narration',
+      text:'他把一串钥匙随手甩在玄关柜上，红漆机车的钥匙扣磕出一声脆响。' },
+    { id:'b13', type:'dialogue', speaker:'卡什',
+      text:'「Rule number one, roomie.」他竖起一根手指，「Don\'t touch my bike. 别碰我的车。其他随便。」' },
+    { id:'b14', type:'choice', prompt:'你怎么接？',
+      options:[
+        { text:'「放心，我对铁疙瘩没兴趣。」',       affection:2, next:'b15a' },
+        { text:'「那你最好也别碰我的咖啡机。」',     affection:5, next:'b15b' },
+        { text:'「第二条规矩呢？」',                 affection:1, next:'b15c' }
+      ]},
+    { id:'b15a', type:'dialogue', speaker:'卡什', next:'b16',
+      text:'「Ha. We\'ll see.」——哈，走着瞧。' },
+    { id:'b15b', type:'dialogue', speaker:'卡什', next:'b16',
+      text:'他挑眉，嘴角那点笑意慢慢扩开。「Oh, I like you already.」——哦，我已经开始喜欢你了。' },
+    { id:'b15c', type:'dialogue', speaker:'卡什', next:'b16',
+      text:'「第二条？」他愣了一下，然后笑出声，「There\'s no rule two. 规矩只有一条。」' },
+    { id:'b16', type:'narration',
+      text:'他转身往沙发上一倒，长腿一伸，占了整张沙发。金发陷进靠垫里，像只占了领地的狐狸。' },
+    { id:'b17', type:'dialogue', speaker:'卡什',
+      text:'「So... dinner? 晚饭？」他朝你晃了晃手机，屏幕上是全英文的外卖 App。「Translate for me, and I\'ll pay.」——帮我翻译，我请客。' },
+    { id:'b18', type:'inner', speaker:'小桁',
+      text:'（开局第一天就要我当翻译。这室友，怕不是个长期饭票型的麻烦。）' },
+    { id:'b19', type:'choice', prompt:'今晚，你的选择是——',
+      options:[
+        { text:'「行吧。但你请客。」',   affection:5,  next:'b20a' },
+        { text:'「先交学费。」',         affection:3,  next:'b20b' },
+        { text:'「自己学中文。」',       affection:-3, next:'b20c' }
+      ]},
+    { id:'b20a', type:'dialogue', speaker:'卡什', next:'b21',
+      text:'「Deal.」——成交。他打了个响指，看起来比刚才高兴了一点。' },
+    { id:'b20b', type:'dialogue', speaker:'卡什', next:'b21',
+      text:'「Tuition? I\'m broke, man.」——学费？哥们我破产了。他说这话的时候，一点不好意思都没有。' },
+    { id:'b20c', type:'dialogue', speaker:'卡什', next:'b21',
+      text:'「Nah.」——不。他翻了个身，背对着你，声音闷在靠垫里，「反正你会帮我的。」' },
+    { id:'b21', type:'narration',
+      text:'窗外天色暗下来。你听见他肚子叫了一声，很响。' },
+    { id:'b22', type:'narration',
+      text:'——和室友恋爱的错误示范，第一章，开始了。' },
+    { id:'bEND', type:'chapter_end' }
+  ]
+};
+
+/** 默认 Q&A */
+const DEFAULT_QNA = [
+  { type:'qna', id:'qa_001', category:'日常', unlock:0,
+    question:'你早上几点起？',
+    answer:'「看昨晚打到几点。要是三点睡的，那就……中午吧。」\n他理直气壮地说完，又补了一句：「反正你早上会煮咖啡，我闻得到。」' },
+  { type:'qna', id:'qa_002', category:'喜好', unlock:0,
+    question:'最喜欢的东西是什么？',
+    answer:'「My bike. 我那台红的。」他顿了两秒，「……还有 party，闪灯球，公路，和不用早起。」' },
+  { type:'qna', id:'qa_003', category:'日常', unlock:5,
+    question:'为什么要一直戴着墨镜？',
+    answer:'「Style.」\n他说得太快了，快得像背过的答案。\n然后他把脸别开：「……下一题。」' },
+  { type:'qna', id:'qa_004', category:'恋爱', unlock:20,
+    question:'你谈过几次恋爱？',
+    answer:'「Counting? 那得数好久。」他笑得吊儿郎当，「但你要问认真的——zero。」\n「……别用那种眼神看我。」' },
+  { type:'qna', id:'qa_005', category:'过去', unlock:35,
+    question:'家里出事的时候，你在哪？',
+    answer:'他难得沉默了一会儿。\n「在酒吧。台上。」\n「唱到一半，手机震了十七次。我没接。」' },
+  { type:'qna', id:'qa_006', category:'秘密', unlock:60,
+    question:'你戴墨镜，其实是因为看不清吧？',
+    answer:'「……」\n他把墨镜摘了下来，第一次完整地看你。蓝色的眼睛有点失焦。\n「别告诉别人。」他说，「求你。」' }
+];
+
+/** 默认角色档案 */
+const DEFAULT_CHARINFO = [
+  { type:'charinfo', target:'mott', id:'ci_mott_1', unlock:0, title:'小桁 · 基础档案',
+    content:'（此条目留空，等待你通过代码工坊导入自己的设定。）' },
+
+  { type:'charinfo', target:'cash', id:'ci_cash_basic', unlock:0, title:'基础资料',
+    content:'身高 183cm ｜ 23 岁 ｜ ESTP ｜ 白羊座（4/1） ｜ 动物塑：北美赤狐' },
+  { type:'charinfo', target:'cash', id:'ci_cash_look', unlock:5, title:'外貌速写',
+    content:'一头耀眼金发，典型金发碧眼，鼻梁上架着半永久墨镜。晒黑系偏白皮肤，淡淡雀斑，张扬上挑的眼型，嘴角右下方有一颗痣。\n笑起来的时候，那颗痣会先动。' },
+  { type:'charinfo', target:'cash', id:'ci_cash_char', unlock:15, title:'性格切片',
+    content:'热脸贱、轻浮、张扬跋扈、傲慢但爽快、自由至上、享乐主义、冲动、大大咧咧、讲义气、护短、嘴欠、调情高手。\n以及——游戏打得非常菜。' },
+  { type:'charinfo', target:'cash', id:'ci_cash_past', unlock:30, title:'过去',
+    content:'前富二代花花公子。家族企业遇危机后被「流放」到合租公寓。\n他不太提这件事，提起来的时候会笑，笑得比平时用力。' },
+  { type:'charinfo', target:'cash', id:'ci_cash_love', unlock:45, title:'恋爱观',
+    content:'爱情三角理论里，他只有 Passion。\n曾经是糟糕的孔雀开屏式 playboy，有承诺恐惧。\n——但真的动情之后，会极依赖对方。' },
+
+  { type:'charinfo', target:'cash', group:'item', id:'it_glasses', unlock:0, title:'半永久墨镜',
+    content:'他从不在室内摘下它。\n真实原因：视力差，需要墨镜掩盖。不愿暴露弱点。' },
+  { type:'charinfo', target:'cash', group:'item', id:'it_key', unlock:5, title:'红漆机车钥匙',
+    content:'钥匙扣已经磨得发亮。\n潮流换了一轮又一轮，只有这台车是他唯一真爱。' },
+  { type:'charinfo', target:'cash', group:'item', id:'it_lighter', unlock:20, title:'Zippo 打火机',
+    content:'背面刻着一个模糊的缩写，被磨掉了一半。\n他从不点烟，只是转着玩。' },
+  { type:'charinfo', target:'cash', group:'item', id:'it_bill', unlock:35, title:'西尔酒馆的账单',
+    content:'厚厚一沓。最上面一张的日期，是他家出事的那天。\n那天他点了最便宜的一杯。' },
+  { type:'charinfo', target:'cash', group:'item', id:'it_pad', unlock:50, title:'游戏手柄',
+    content:'摇杆被磨出了明显的凹痕。\n战绩：0 胜 47 负。他坚称是网络问题。' }
+];
+
+/** 默认人际关系 */
+const DEFAULT_RELATIONS = [
+  { type:'relation', id:'rel_adrian', unlock:0, name:'阿德里安', role:'乐队队友 · 铁哥们',
+    desc:'一起组过小乐队。仗义，酷，是那种话不多但永远会在的人。' },
+  { type:'relation', id:'rel_cecil', unlock:10, name:'塞西尔', role:'西尔酒馆 · 调酒师',
+    desc:'两人曾在小酒馆驻唱。卡什极喜欢塞西尔吹的萨克斯。' },
+  { type:'relation', id:'rel_mott', unlock:0, name:'小桁', role:'室友',
+    desc:'互相「掐」的日常关系。卡什喝醉时，小桁会负责把他的嘴闭上。' }
+];
+
+/** 默认彩蛋副本 */
+const DEFAULT_SIDES = [
+  {
+    type:'side',
+    id:'side_01',
+    title:'彩蛋 · 便利店之夜',
+    intro:'凌晨两点，卡什想吃冰激凌。',
+    unlock:{ affectionMin:5 },
+    beats:[
+      { id:'s1', type:'narration', text:'凌晨两点。你被客厅里的动静吵醒。' },
+      { id:'s2', type:'dialogue', speaker:'卡什', text:'「Yo. 你也没睡？」他蹲在冰箱前，金发乱糟糟的，墨镜居然还戴着。' },
+      { id:'s3', type:'dialogue', speaker:'卡什', text:'「冰箱空了。I need ice cream. 我要冰激凌。」' },
+      { id:'s4', type:'inner', speaker:'小桁', text:'（凌晨两点。冰激凌。）' },
+      { id:'s5', type:'choice', prompt:'你要——', options:[
+        { text:'「穿外套。我陪你去。」', affection:5, next:'s6a' },
+        { text:'「自己去，钥匙在玄关。」', affection:-2, next:'s6b' }
+      ]},
+      { id:'s6a', type:'dialogue', speaker:'卡什', next:'s7',
+        text:'他愣了半秒，然后笑开：「Oh. Okay. Okay, cool.」——哦。好，好，可以。' },
+      { id:'s6b', type:'dialogue', speaker:'卡什', next:'s7',
+        text:'「……Fine.」他站起来，走了两步，又回头看你一眼。那一眼有点长。' },
+      { id:'s7', type:'narration', text:'九月的夜风比想象中凉。便利店的灯白得刺眼。' },
+      { id:'s8', type:'dialogue', speaker:'卡什', text:'他挑了一盒最贵的。「你请。」他说得理所当然。' },
+      { id:'s9', type:'narration', text:'——这是你们第一次在深夜并肩走路。' },
+      { id:'sEND', type:'chapter_end' }
+    ]
   }
-  renderHud();
-}
-function applySet(fx){
-  if(!fx) return;
-  for(const k in fx){
-    if(!(k in ATTR_DEF)) continue;
-    S.attrs[k] = clamp(k, fx[k]);
-  }
-  renderHud();
-}
+];
 
-/* ══════════════════ 舞台渲染 ══════════════════ */
-const stage = $('#stage');
-const choicesBox = $('#choices');
-const hudBox = $('#hud');
+/* ============================================================================
+   =========================  PART 3 · 全局状态  ==============================
+   ============================================================================ */
+let DB = {
+  chapters:{}, qna:{}, charinfo:{}, relations:{}, sides:{},
+  levels: DEFAULT_LEVELS.slice(),
+  config: Object.assign({}, DEFAULT_CONFIG),
+  achievements: []
+};
 
-function appendLine(e){
-  const div = document.createElement('div');
-  if(e.k === 'n'){
-    div.className = 'line narr';
-    div.textContent = e.x;
-  }else if(e.k === 's'){
-    div.className = 'line say';
-    const c = whoColor(e.who);
-    let html = '<div class="who" style="color:' + c + '">' + esc(e.who) + '</div>' +
-               '<div class="bubble">' + esc(e.x);
-    if(e.cn) html += '<div class="b-cn">' + esc(e.cn) + '</div>';
-    html += '</div>';
-    div.innerHTML = html;
-  }else if(e.k === 'scene'){
-    div.className = 'line scene-title';
-    div.textContent = e.x;
-  }else if(e.k === 'hr'){
-    div.className = 'line hr';
-  }else{
-    return;
-  }
-  stage.appendChild(div);
-}
+/** 主线存档对象 */
+let mainSave = null;
 
-function renderLog(){
-  stage.innerHTML = '';
-  S.log.forEach(appendLine);
-  scrollBottom();
-}
+/** 运行时状态 */
+const App = {
+  page:'page-home',
+  mode:'main',           // 'main' | 'side'
+  sideId:null,
+  chapter:null,
+  beatIndex:0,
+  currentBeat:null,
+  typing:false,
+  typeTimer:null,
+  autoTimer:null,
+  autoMode:false,
+  skipMode:false,
+  applied:{},            // 已结算好感度的 beat，形如 { 'ch01#b7': true }
+  seen:{},               // 已读 beat，形如 { 'ch01:b7': true }
+  history:[],
+  appliedSide:{},
+  qnaFilter:'全部',
+  infoTab:'cash'
+};
 
-function scrollBottom(){
-  requestAnimationFrame(() => { stage.scrollTop = stage.scrollHeight; });
-}
+/* ============================================================================
+   =========================  PART 4 · 存档系统  ==============================
+   ============================================================================ */
 
-function renderHud(){
-  hudBox.innerHTML = '';
-  for(const k in ATTR_DEF){
-    const d = ATTR_DEF[k];
-    const v = Math.round(S.attrs[k] ?? d.init);
-    const el = document.createElement('div');
-    el.className = 'chip';
-    el.dataset.k = k;
-    el.innerHTML = '<i style="background:' + d.color + '"></i>' + d.label + ' <b>' + v + '</b>';
-    hudBox.appendChild(el);
-  }
-}
-
-/* ══════════════════ 选项渲染 ══════════════════ */
-function clearChoices(){
-  choicesBox.innerHTML = '';
-  setHint(true);
-}
-
-function setHint(on){
-  let h = stage.querySelector('.tap-hint');
-  if(!h){
-    h = document.createElement('div');
-    h.className = 'tap-hint';
-    h.textContent = '点击继续 ▼';
-    stage.appendChild(h);
-  }
-  h.classList.toggle('off', !on);
-}
-
-function renderChoices(st){
-  choicesBox.innerHTML = '';
-  setHint(false);
-  const opts = (st.o || []).filter(o => !(o.once && o.key && S.flags['opt_' + o.key]));
-  opts.forEach((o, i) => {
-    const b = document.createElement('button');
-    b.className = 'choice';
-    b.style.animationDelay = (i * 0.045) + 's';
-    b.textContent = o.l;
-    b.addEventListener('click', ev => { ev.stopPropagation(); choose(o); });
-    choicesBox.appendChild(b);
-  });
-  scrollBottom();
-}
-
-/* ══════════════════ 核心流程 ══════════════════ */
-function snapshot(){
+function newMainSave(){
   return {
-    chId:S.chId, node:S.node, idx:S.idx,
-    attrs:clone(S.attrs), flags:clone(S.flags),
-    log:S.log.slice(), awaiting:S.awaiting, ended:S.ended
+    version:1,
+    affection:1,
+    chapterId:null,
+    beatIndex:0,
+    started:false,
+    seen:{},
+    history:[],
+    applied:{},
+    notifiedLevels:[],
+    achievements:[],
+    updated:Date.now()
   };
 }
-function pushHistory(){
-  history.push(snapshot());
-  if(history.length > 400) history.shift();
-}
-function restore(snap){
-  S.chId = snap.chId; S.node = snap.node; S.idx = snap.idx;
-  S.attrs = snap.attrs; S.flags = snap.flags; S.log = snap.log;
-  S.awaiting = snap.awaiting; S.ended = snap.ended;
-  hideOverlay();
-  clearChoices();
-  renderLog();
-  renderHud();
-  updateChapterTitle();
-  if(S.awaiting){
-    const step = currentStep();
-    if(step && step.t === 'c') renderChoices(step);
-  }
+
+function loadMain(){
+  const s = store.get(K.main, null);
+  mainSave = (s && typeof s === 'object') ? Object.assign(newMainSave(), s) : newMainSave();
+  App.seen    = mainSave.seen;
+  App.history = mainSave.history;
+  App.applied = mainSave.applied;
 }
 
-function currentStep(){
-  const ch = Game.chapters[S.chId];
-  if(!ch) return null;
-  const node = ch.nodes[S.node];
-  if(!node) return null;
-  return (node.steps || [])[S.idx] || null;
+function saveMain(){
+  mainSave.updated = Date.now();
+  store.set(K.main, mainSave);
 }
 
-function advance(){
-  if(S.awaiting || S.ended || !S.chId) return;
-  pushHistory();
-  step();
-  save();
-}
-
-function step(){
-  let guard = 0;
-  while(guard++ < 4000){
-    const ch = Game.chapters[S.chId];
-    if(!ch){ finish(null); return; }
-    const node = ch.nodes[S.node];
-    if(!node){ finish(null); return; }
-    const steps = node.steps || [];
-
-    if(S.idx >= steps.length){
-      if(node.next){ S.node = node.next; S.idx = 0; continue; }
-      finish(null); return;
+/** 保存进度（章节/beat） */
+function saveProgress(){
+  if (App.mode === 'side'){
+    // 副本存档完全独立
+    if (App.sideId){
+      store.set(sideSaveKey(App.sideId), {
+        beatIndex: App.beatIndex,
+        applied: App.appliedSide,
+        updated: Date.now()
+      });
     }
+    return;
+  }
+  mainSave.chapterId = App.chapter ? App.chapter.id : mainSave.chapterId;
+  mainSave.beatIndex = App.beatIndex;
+  mainSave.started = true;
+  saveMain();
+}
 
-    const st = steps[S.idx];
-    switch(st.t){
-      case 'n':
-        S.log.push({ k:'n', x:st.x });
-        S.idx++; appendLine(S.log[S.log.length - 1]); scrollBottom();
-        return;
+/** 手动存档到槽位 */
+function saveToSlot(i){
+  if (App.mode !== 'main'){ toast('副本中无法保存到主线存档槽', 'warn'); return; }
+  const slot = {
+    ts: Date.now(),
+    affection: mainSave.affection,
+    chapterId: mainSave.chapterId,
+    chapterTitle: App.chapter ? App.chapter.title : '（未知章节）',
+    beatIndex: App.beatIndex,
+    summary: buildSummary(),
+    save: JSON.parse(JSON.stringify(mainSave))
+  };
+  store.set(K.slots[i], slot);
+  toast('已保存到存档槽 ' + (i+1), 'ok');
+}
 
-      case 's':
-        S.log.push({ k:'s', who:st.who, x:st.x, cn:st.cn });
-        S.idx++; appendLine(S.log[S.log.length - 1]); scrollBottom();
-        return;
+function buildSummary(){
+  const last = (mainSave.history || []).slice(-1)[0];
+  if (!last) return '故事刚刚开始。';
+  return (last.speaker ? last.speaker + '：' : '') + String(last.text||'').slice(0, 26);
+}
 
-      case 'scene':
-        S.log.push({ k:'scene', x:st.x });
-        S.idx++; appendLine(S.log[S.log.length - 1]); scrollBottom();
-        return;
+function loadFromSlot(i){
+  const slot = store.get(K.slots[i], null);
+  if (!slot || !slot.save){ toast('该存档槽为空', 'warn'); return; }
+  mainSave = Object.assign(newMainSave(), slot.save);
+  App.seen    = mainSave.seen;
+  App.history = mainSave.history;
+  App.applied = mainSave.applied;
+  saveMain();
+  closeModal();
+  continueGame();
+  toast('已读取存档槽 ' + (i+1), 'ok');
+}
 
-      case 'hr':
-        S.log.push({ k:'hr' });
-        S.idx++; appendLine(S.log[S.log.length - 1]); scrollBottom();
-        return;
+function deleteSlot(i){
+  store.del(K.slots[i]);
+  toast('已删除存档槽 ' + (i+1));
+  openSlotsModal();
+}
 
-      case 'fx':
-        applyFx(st.fx); S.idx++; continue;
+/* ============================================================================
+   =========================  PART 5 · 好感度系统  ============================
+   ============================================================================ */
 
-      case 'set':
-        applySet(st.set); S.idx++; continue;
+function getAffection(){
+  return mainSave ? mainSave.affection : 1;
+}
 
-      case 'flag':
-        S.flags[st.name] = true; S.idx++; continue;
+function getLevelName(v){
+  const lv = DB.levels || DEFAULT_LEVELS;
+  for (let i=0;i<lv.length;i++){
+    if (v >= lv[i].min && v <= lv[i].max) return lv[i].name;
+  }
+  // 超出范围时退回到最接近的
+  if (lv.length && v > lv[lv.length-1].max) return lv[lv.length-1].name;
+  if (lv.length && v < lv[0].min) return lv[0].name;
+  return '未知';
+}
 
-      case 'j':
-        S.node = st.to; S.idx = 0; continue;
+function getLevelObj(v){
+  const lv = DB.levels || DEFAULT_LEVELS;
+  for (let i=0;i<lv.length;i++){
+    if (v >= lv[i].min && v <= lv[i].max) return lv[i];
+  }
+  return null;
+}
 
-      case 'c':
-        S.awaiting = true;
-        renderChoices(st);
-        return;
+/** 好感度变化 */
+function changeAffection(n){
+  if (!n) return;
+  showAffPop(n);
 
-      case 'end':
-        finish(st);
-        return;
+  // 副本模式：不影响主线，仅做视觉反馈
+  if (App.mode === 'side') return;
 
-      default:
-        S.idx++; continue;
+  const oldVal = mainSave.affection;
+  const newVal = clamp(oldVal + n, 1, 100);
+  if (newVal === oldVal) return;
+
+  mainSave.affection = newVal;
+  updateAffectionUI();
+  checkLevelUp(oldVal, newVal);
+  checkAchievements();
+  saveMain();
+}
+
+/** 好感度浮动气泡 */
+function showAffPop(n){
+  const wrap = $('#affPopWrap');
+  const el = document.createElement('div');
+  el.className = 'aff-pop ' + (n > 0 ? 'up' : 'down');
+  el.textContent = (n > 0 ? '+' : '') + n + ' 好感度';
+  wrap.appendChild(el);
+  setTimeout(()=>el.remove(), 1600);
+}
+
+/** 等级提升特效 */
+function checkLevelUp(oldVal, newVal){
+  const oldLv = getLevelObj(oldVal);
+  const newLv = getLevelObj(newVal);
+  if (!newLv) return;
+  if (oldLv && oldLv.name === newLv.name) return;
+  if (!DB.config.showLevelUp) return;
+
+  const wrap = $('#levelUpWrap');
+  wrap.innerHTML =
+    '<div class="lu-card">' +
+      '<div class="lu-small">好感度等级提升</div>' +
+      '<div class="lu-name">' + esc(newLv.name) + '</div>' +
+      '<div class="lu-num">' + newVal + ' / 100</div>' +
+    '</div>';
+  wrap.classList.add('show');
+  setTimeout(()=>{ wrap.classList.remove('show'); }, 2400);
+}
+
+/** 更新顶部 UI */
+function updateAffectionUI(){
+  const v = getAffection();
+  $('#gAffNum').textContent = v;
+  $('#gAffFill').style.width = ((v-1)/99*100) + '%';
+  $('#gAffLevel').textContent = getLevelName(v);
+}
+
+/** 成就检查 */
+function checkAchievements(){
+  const v = getAffection();
+  const list = DB.achievements.length ? DB.achievements : DEFAULT_ACHIEVEMENTS;
+  list.forEach(a=>{
+    if (v >= a.unlock && mainSave.achievements.indexOf(a.id) === -1){
+      mainSave.achievements.push(a.id);
+      toast('🏆 解锁成就：' + a.title, 'ok');
+    }
+  });
+  saveMain();
+}
+
+/* ============================================================================
+   =========================  PART 6 · 剧情引擎  ==============================
+   ============================================================================ */
+
+function findNextChapter(order){
+  const list = Object.keys(DB.chapters).map(k=>DB.chapters[k])
+                .filter(c=>c && typeof c.order === 'number')
+                .sort((a,b)=>a.order-b.order);
+  for (let i=0;i<list.length;i++){
+    if (list[i].order > order) return list[i];
+  }
+  return null;
+}
+
+function getFirstChapter(){
+  const list = Object.keys(DB.chapters).map(k=>DB.chapters[k])
+                .filter(c=>c && typeof c.order === 'number')
+                .sort((a,b)=>a.order-b.order);
+  return list[0] || null;
+}
+
+/** 开始新游戏 */
+function startNewGame(){
+  const first = getFirstChapter();
+  if (!first){ toast('剧情库为空，请先在代码工坊导入章节', 'err'); return; }
+  if (mainSave.started){
+    openModal({
+      title:'重新开始？',
+      body:'当前已有进度，重新开始会清空好感度、已读记录与剧情进度（内容库与解锁数据保留）。',
+      buttons:[
+        { text:'取消', cls:'' , act: closeModal },
+        { text:'确认重新开始', cls:'btn-primary', act: ()=>{
+          const keepAch = mainSave.achievements;
+          mainSave = newMainSave();
+          mainSave.achievements = keepAch;
+          App.seen = mainSave.seen;
+          App.history = mainSave.history;
+          App.applied = mainSave.applied;
+          saveMain();
+          closeModal();
+          beginChapter(first);
+        }}
+      ]
+    });
+    return;
+  }
+  beginChapter(first);
+}
+
+/** 进入某一章 */
+function beginChapter(ch){
+  App.mode = 'main';
+  App.chapter = ch;
+  App.beatIndex = 0;
+  mainSave.chapterId = ch.id;
+  mainSave.beatIndex = 0;
+  mainSave.started = true;
+  saveMain();
+  showPage('page-game');
+  renderBeat();
+}
+
+/** 继续游戏 */
+function continueGame(){
+  if (!mainSave.started || !mainSave.chapterId){
+    startNewGame();
+    return;
+  }
+  const ch = DB.chapters[mainSave.chapterId];
+  if (!ch){
+    toast('未找到章节数据：' + mainSave.chapterId, 'err');
+    return;
+  }
+  App.mode = 'main';
+  App.chapter = ch;
+  App.beatIndex = mainSave.beatIndex || 0;
+  App.seen = mainSave.seen;
+  App.history = mainSave.history;
+  App.applied = mainSave.applied;
+  showPage('page-game');
+  renderBeat();
+}
+
+/** 章节重玩（不影响主进度） */
+function replayChapter(id){
+  const ch = DB.chapters[id];
+  if (!ch) return;
+  // 使用临时快照，退出时不写回主进度
+  const snapshot = {
+    chapterId: mainSave.chapterId,
+    beatIndex: mainSave.beatIndex,
+    applied: mainSave.applied
+  };
+  App.mode = 'replay';
+  App.chapter = ch;
+  App.beatIndex = 0;
+  App.applied = {};     // 独立结算
+  showPage('page-game');
+  renderBeat();
+  toast('重玩模式：退出后不会影响主线进度', 'warn');
+}
+
+/* ---------------------------------------------------------------------------
+   渲染单个 beat
+   --------------------------------------------------------------------------- */
+function renderBeat(){
+  const ch = App.chapter;
+  if (!ch) return;
+  const beats = ch.beats || [];
+
+  if (App.beatIndex >= beats.length){
+    finishChapter();
+    return;
+  }
+
+  const beat = beats[App.beatIndex];
+  App.currentBeat = beat;
+
+  // ---- 好感度结算（每个 beat 只结算一次）----
+  if (beat.affection){
+    const key = ch.id + '#' + (beat.id != null ? beat.id : App.beatIndex);
+    const store = (App.mode === 'side') ? App.appliedSide : App.applied;
+    if (!store[key]){
+      store[key] = true;
+      changeAffection(beat.affection);
     }
   }
-}
 
-function choose(o){
-  if(!S.awaiting) return;
-  S.awaiting = false;
-  clearChoices();
+  hideChoices();
+  hideBubble();
 
-  if(o.fx) applyFx(o.fx);
-  if(o.set) applySet(o.set);
-  if(o.flag) S.flags[o.flag] = true;
-  if(o.once && o.key) S.flags['opt_' + o.key] = true;
-
-  if(o.to){
-    S.node = o.to;
-    S.idx = 0;
-  }else{
-    S.idx++;
+  switch(beat.type){
+    case 'narration':
+      showText('', beat.text || '', 'narration');
+      break;
+    case 'dialogue':
+      showText(beat.speaker || '', beat.text || '', 'dialogue');
+      break;
+    case 'inner':
+      showText(beat.speaker || '小桁', beat.text || '', 'inner');
+      break;
+    case 'choice':
+      showText('', beat.prompt || '', 'narration');
+      showChoices(beat);
+      break;
+    case 'affection_event':
+      showText('', beat.text || '', 'narration');
+      break;
+    case 'chapter_end':
+      finishChapter();
+      return;
+    default:
+      showText('', beat.text || '', 'narration');
   }
-  step();
-  save();
-}
 
-function finish(st){
-  S.ended = true;
-  S.awaiting = false;
-  clearChoices();
-  setHint(false);
-
-  const ch = Game.chapters[S.chId];
-  const nextId = ch && ch.nextChapter;
-  const hasNext = nextId && Game.chapters[nextId];
-
-  if(st && st.id){
-    unlockedEndings.add(st.id);
-    persistEndings();
-    const meta = Game.endings[st.id] || { name:'未命名结局', desc:'' };
-    showOverlay('ENDING', meta.name || st.id, meta.desc || '', hasNext ? nextId : null);
-  }else{
-    showOverlay('CHAPTER', '本章结束', '故事在这里暂时停下了。', hasNext ? nextId : null);
+  // 写入历史
+  if (beat.type === 'narration' || beat.type === 'dialogue' || beat.type === 'inner'){
+    pushHistory({
+      type: beat.type,
+      speaker: beat.speaker || '',
+      text: beat.text || ''
+    });
   }
-  save();
+
+  updateAffectionUI();
 }
 
-/* ══════════════════ 覆盖层 ══════════════════ */
-const ov = $('#ov');
+/** 显示文本（带打字机） */
+function showText(speaker, text, kind){
+  const box = $('#gBox');
+  const tag = $('#gSpeaker');
+  const txt = $('#gText');
+  const hint = $('#gHint');
 
-function showOverlay(tag, title, desc, nextId){
-  $('#ovTag').textContent = tag;
-  $('#ovTitle').textContent = title;
-  $('#ovDesc').textContent = desc || '';
-  const nb = $('#ovNext');
-  if(nextId && Game.chapters[nextId]){
-    nb.style.display = '';
-    nb.dataset.next = nextId;
-    nb.textContent = '▶ 继续下一章';
-  }else{
-    nb.style.display = 'none';
-    nb.dataset.next = '';
+  box.className = 'dialogue-box ' + (kind || 'narration');
+  hint.classList.remove('show');
+
+  if (speaker){
+    tag.style.display = '';
+    tag.textContent = speaker;
+  } else {
+    tag.style.display = 'none';
   }
-  ov.classList.add('is-on');
-}
-function hideOverlay(){ ov.classList.remove('is-on'); }
 
-$('#ovClose').addEventListener('click', hideOverlay);
-$('#ovRestart').addEventListener('click', () => { hideOverlay(); startChapter(S.chId); });
-$('#ovRewind').addEventListener('click', () => { hideOverlay(); rewindToChoice(); });
-$('#ovNext').addEventListener('click', () => {
-  const id = $('#ovNext').dataset.next;
-  if(!id || !Game.chapters[id]) return;
-  hideOverlay();
-  startChapter(id);
-});
+  clearInterval(App.typeTimer);
+  txt.textContent = '';
 
-/* ══════════════════ 回退 ══════════════════ */
-function rewind(){
-  if(!history.length){ flashHint('已经回到最开始了'); return; }
-  restore(history.pop());
-  save();
+  const cfg = DB.config;
+  const speed = (cfg.typewriter === false) ? 0 : (cfg.speed || 28);
+
+  if (App.skipMode || speed <= 0){
+    txt.textContent = text;
+    App.typing = false;
+    hint.classList.add('show');
+    scheduleAuto();
+    return;
+  }
+
+  App.typing = true;
+  let i = 0;
+  App.typeTimer = setInterval(function(){
+    txt.textContent += text.charAt(i);
+    i++;
+    if (i >= text.length){
+      clearInterval(App.typeTimer);
+      App.typing = false;
+      hint.classList.add('show');
+      scheduleAuto();
+    }
+  }, speed);
 }
-function rewindToChoice(){
-  while(history.length){
-    const snap = history.pop();
-    const ch = Game.chapters[snap.chId];
-    const node = ch && ch.nodes[snap.node];
-    const st = node && (node.steps || [])[snap.idx];
-    restore(snap);
-    if(st && st.t === 'c'){
-      S.awaiting = true;
-      renderChoices(st);
+
+/** 立刻结束打字 */
+function finishTyping(){
+  if (!App.typing) return false;
+  clearInterval(App.typeTimer);
+  App.typing = false;
+  const beat = App.currentBeat;
+  if (beat) $('#gText').textContent = beat.text || beat.prompt || '';
+  $('#gHint').classList.add('show');
+  return true;
+}
+
+/** 显示选项 */
+function showChoices(beat){
+  const wrap = $('#gChoices');
+  wrap.innerHTML = '';
+  const opts = beat.options || [];
+  let shown = 0;
+
+  opts.forEach(function(opt){
+    // 条件可见性
+    if (opt.require && typeof opt.require.affectionMin === 'number'){
+      if (getAffection() < opt.require.affectionMin) return;
+    }
+    shown++;
+    const b = document.createElement('button');
+    b.className = 'choice-btn';
+    b.textContent = opt.text || '……';
+    b.addEventListener('click', function(e){
+      e.stopPropagation();
+      pickChoice(opt);
+    });
+    wrap.appendChild(b);
+  });
+
+  if (shown === 0){
+    // 兜底：所有选项都被条件挡掉时，直接推进
+    const b = document.createElement('button');
+    b.className = 'choice-btn';
+    b.textContent = '（继续）';
+    b.addEventListener('click', function(e){ e.stopPropagation(); advance(); });
+    wrap.appendChild(b);
+  }
+
+  wrap.classList.add('show');
+}
+
+function hideChoices(){
+  $('#gChoices').classList.remove('show');
+  $('#gChoices').innerHTML = '';
+}
+
+/** 选择处理 */
+function pickChoice(opt){
+  hideChoices();
+  markSeen();
+  if (opt.affection) changeAffection(opt.affection);
+
+  if (opt.next){
+    const idx = (App.chapter.beats || []).findIndex(b => b.id === opt.next);
+    if (idx >= 0){
+      App.beatIndex = idx;
+      saveProgress();
+      renderBeat();
       return;
     }
   }
-  rewind();
-}
-function flashHint(txt){
-  const h = $('#hint') || stage.querySelector('.tap-hint');
-  if(stage.querySelector('.tap-hint')){
-    const hh = stage.querySelector('.tap-hint');
-    hh.textContent = txt;
-    hh.classList.remove('off');
-    setTimeout(() => { hh.textContent = '点击继续 ▼'; }, 1400);
-  }
-}
-
-/* ══════════════════ 章节启停 ══════════════════ */
-function startChapter(chId){
-  const ch = Game.chapters[chId];
-  if(!ch) return;
-  if(!Object.keys(S.attrs).length) S.attrs = freshAttrs();
-  S.chId = chId;
-  S.node = ch.start;
-  S.idx = 0;
-  S.log = [];
-  S.ended = false;
-  S.awaiting = false;
-  history = [];
-  clearChoices();
-  stage.innerHTML = '';
-  hideOverlay();
-  updateChapterTitle();
-  renderHud();
-  renderLog();
-  step();
-  save();
-  setView('story');
-}
-
-function restartCurrent(){
-  if(!S.chId) return;
-  startChapter(S.chId);
-}
-
-/* ══════════════════ 存档 ══════════════════ */
-function save(){
-  try{
-    // 无论是否 ended，都把「当前章节 + 属性 + flags」存下来，
-    // 只是 ended 时不再存节点进度（因为节点进度已无意义）
-    const payload = {
-      chId: S.chId,
-      node: S.ended ? null : S.node,
-      idx:  S.ended ? 0    : S.idx,
-      attrs: S.attrs,
-      flags: S.flags,
-      log:   S.ended ? []  : S.log,
-      ended: S.ended
-    };
-    localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
-  }catch(e){}
-}
-function load(){
-  try{
-    const raw = localStorage.getItem(SAVE_KEY);
-    if(!raw) return false;
-    const d = JSON.parse(raw);
-    if(!d.chId || !Game.chapters[d.chId]) return false;
-
-    // 恢复属性、flags（跨章节继承的关键）
-    S.attrs = Object.assign(freshAttrs(), d.attrs || {});
-    S.flags = d.flags || {};
-    history = [];
-    S.awaiting = false;
-
-    // 情况一：上次停在一章结束（ended）→ 从该章的结尾续上
-    if(d.ended){
-      const ch = Game.chapters[d.chId];
-      // 试着跳到该章配置的下一章
-      if(ch && ch.nextChapter && Game.chapters[ch.nextChapter]){
-        startChapter(ch.nextChapter);
-        return true;
-      }
-      // 没配下一章，就回到该章的起点重新展示
-      startChapter(d.chId);
-      return true;
-    }
-
-    // 情况二：上次停在章节中途 → 原地恢复
-    S.chId = d.chId;
-    S.node = d.node;
-    S.idx  = d.idx;
-    S.log  = d.log || [];
-    S.ended = false;
-    renderHud();
-    renderLog();
-    updateChapterTitle();
-    step();
-    return true;
-  }catch(e){ return false; }
-}
-
-/* ══════════════════ 视图切换 ══════════════════ */
-function setView(name){
-  document.querySelectorAll('.view').forEach(v => v.classList.toggle('is-on', v.id === 'v-' + name));
-  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('is-on', t.dataset.view === name));
-  if(name === 'chapters') renderChapterList();
-  if(name === 'endings')  renderEndings();
-  if(name === 'status')   renderStatus();
-  if(name === 'recap')    renderRecap();
-}
-
-document.querySelectorAll('.tab').forEach(t => {
-  t.addEventListener('click', () => setView(t.dataset.view));
-});
-$('#btnMenu').addEventListener('click', () => setView('chapters'));
-
-/* ══════════════════ 章节列表 ══════════════════ */
-function renderChapterList(){
-  const box = $('#chList');
-  box.innerHTML = '';
-  if(!Game.order.length){
-    box.innerHTML = '<p class="p-sub">还没有任何章节。去「工坊」导入一段代码吧。</p>';
-    return;
-  }
-  Game.order.forEach((id, i) => {
-    const ch = Game.chapters[id];
-    const card = document.createElement('div');
-    card.className = 'ch-card';
-    const playing = (S.chId === id && !S.ended);
-    card.innerHTML =
-      '<div class="ch-num">' + String(i + 1).padStart(2, '0') + '</div>' +
-      '<div class="ch-meta"><b>' + esc(ch.title || id) + '</b>' +
-      '<span>' + esc(ch.subtitle || '') + '</span></div>' +
-      '<div class="ch-state">' + (playing ? '进行中' : '开始') + '</div>';
-    card.addEventListener('click', () => startChapter(id));
-    box.appendChild(card);
-  });
-}
-
-/* ══════════════════ 结局收集 ══════════════════ */
-function renderEndings(){
-  const grid = $('#edGrid');
-  grid.innerHTML = '';
-  const ids = Object.keys(Game.endings);
-  if(!ids.length){
-    grid.innerHTML = '<p class="p-sub">还没有注册任何结局。</p>';
-    $('#edCount').textContent = '';
-    return;
-  }
-  let got = 0;
-  ids.forEach(id => {
-    const meta = Game.endings[id];
-    const on = unlockedEndings.has(id);
-    if(on) got++;
-    const card = document.createElement('div');
-    card.className = 'ed-card ' + (on ? 'unlocked' : 'locked');
-    card.innerHTML =
-      '<b>' + (on ? esc(meta.name || id) : '？？？') + '</b>' +
-      '<p>' + (on ? esc(meta.desc || '') : '尚未抵达的结局。') + '</p>' +
-      '<div class="ed-badge">' + (on ? '已解锁' : '未解锁') + '</div>';
-    grid.appendChild(card);
-  });
-  $('#edCount').textContent = '已解锁 ' + got + ' / ' + ids.length + ' 个结局。';
-}
-
-/* ══════════════════ 状态面板 ══════════════════ */
-function renderStatus(){
-  const box = $('#stRows');
-  box.innerHTML = '';
-  for(const k in ATTR_DEF){
-    const d = ATTR_DEF[k];
-    const v = Math.round(S.attrs[k] ?? d.init);
-    const pct = Math.round(v / d.max * 100);
-    const row = document.createElement('div');
-    row.className = 'st-row';
-    row.innerHTML =
-      '<div class="st-name">' + d.label + '</div>' +
-      '<div class="st-bar"><i style="width:' + pct + '%;background:' + d.color + '"></i></div>' +
-      '<div class="st-val">' + v + '</div>';
-    box.appendChild(row);
-  }
-  const extra = document.createElement('p');
-  extra.className = 'p-sub';
-  extra.style.marginTop = '18px';
-  extra.textContent = '已解锁结局：' + unlockedEndings.size + ' 个 ｜ 已注册章节：' + Game.order.length + ' 章';
-  box.appendChild(extra);
-}
-
-/* ══════════════════ 回顾面板 ══════════════════ */
-function renderRecap(){
-  const box = $('#recapBox');
-  if(!S.log.length){
-    box.innerHTML = '<p class="p-sub">还没有任何记录。</p>';
-    return;
-  }
-  box.innerHTML = S.log.map(e => {
-    if(e.k === 'n')     return '<div class="rc-n">' + esc(e.x) + '</div>';
-    if(e.k === 'scene') return '<div class="rc-scene">' + esc(e.x) + '</div>';
-    if(e.k === 'hr')    return '<div class="rc-hr"></div>';
-    if(e.k === 's'){
-      return '<div class="rc-s">' +
-        '<b style="color:' + whoColor(e.who) + '">' + esc(e.who) + '</b>' +
-        '<span>' + esc(e.x) + '</span>' +
-        (e.cn ? '<i>' + esc(e.cn) + '</i>' : '') +
-      '</div>';
-    }
-    return '';
-  }).join('');
-}
-
-/* ══════════════════ 标题更新 ══════════════════ */
-function updateChapterTitle(){
-  const ch = Game.chapters[S.chId];
-  document.title = ch ? (ch.title || '合租事故') + ' · 合租事故' : '合租事故';
-}
-
-/* ══════════════════ 工坊 ══════════════════ */
-function showMsg(text, ok){
-  const m = $('#codeMsg');
-  m.textContent = text;
-  m.className = 'msg ' + (ok ? 'ok' : 'err');
-  clearTimeout(m._t);
-  m._t = setTimeout(() => { m.className = 'msg'; }, 4200);
-}
-
-$('#btnApply').addEventListener('click', () => {
-  const code = $('#code').value.trim();
-  if(!code){ showMsg('先粘贴一段代码吧。', false); return; }
-  try{
-    const fn = new Function('Game', code);
-    fn(window.Game);
-    showMsg('✔ 导入成功。当前共注册 ' + Game.order.length + ' 个章节。', true);
-    renderChapterList();
-    renderEndings();
-  }catch(err){
-    showMsg('✘ 出错了：' + err.message, false);
-  }
-});
-
-$('#btnTpl').addEventListener('click', () => {
-  $('#code').value =
-`Game.defineChapter({
-  id: 'ch02',
-  order: 2,
-  title: '第二章 · 涨潮',
-  subtitle: '副标题写在这里',
-  start: 'a',
-  endings: {
-    e_ch2: { name: '第二章 · 完', desc: '结局的说明文字。' }
-  },
-  nodes: {
-    a: {
-      steps: [
-        { t:'scene', x:'场景一 · 名字' },
-        { t:'n', x:'这是旁白文本。' },
-        { t:'s', who:'卡什', x:'English line.', cn:'（中文翻译。）' },
-        { t:'fx', fx:{ aff: 5, irr: -5 } },
-        { t:'c', x:'【做出选择】', o:[
-          { l:'选项 A', to:'b', fx:{ aff:5, dom:0, irr:-5 } },
-          { l:'选项 B', to:'c', fx:{ aff:10, dom:5, irr:-5 } }
-        ]}
-      ]
-    },
-    b: { steps:[ { t:'n', x:'分支 B。' } ], next: 'a' },
-    c: { steps:[
-        { t:'n', x:'分支 C 走到了结局。' },
-        { t:'end', id:'e_ch2' }
-      ]
-    }
-  }
-});`;
-});
-
-$('#btnClearCode').addEventListener('click', () => { $('#code').value = ''; });
-
-/* ══════════════════ 按钮绑定 ══════════════════ */
-$('#btnBack').addEventListener('click', rewind);
-$('#btnRestart').addEventListener('click', restartCurrent);
-
-$('#btnAuto').addEventListener('click', function(){
-  if(autoTimer){
-    clearInterval(autoTimer); autoTimer = null;
-    this.classList.remove('on'); this.textContent = '▷ 自动';
-  }else{
-    this.classList.add('on'); this.textContent = '❚❚ 停止';
-    const btn = this;
-    autoTimer = setInterval(() => {
-      if(S.awaiting || S.ended){
-        clearInterval(autoTimer); autoTimer = null;
-        btn.classList.remove('on'); btn.textContent = '▷ 自动';
-        return;
-      }
-      advance();
-    }, 1300);
-  }
-});
-
-stage.addEventListener('click', () => {
-  if(S.awaiting || S.ended) return;
   advance();
-});
-
-document.addEventListener('keydown', e => {
-  if(e.key === ' ' || e.key === 'Enter'){
-    if(!$('#v-story').classList.contains('is-on')) return;
-    if(document.activeElement && document.activeElement.tagName === 'TEXTAREA') return;
-    e.preventDefault();
-    if(!S.awaiting && !S.ended) advance();
-  }
-  if(e.key === 'Backspace'){
-    if(document.activeElement && document.activeElement.tagName === 'TEXTAREA') return;
-    e.preventDefault();
-    rewind();
-  }
-});
-
-/* ══════════════════ 章节变更回调 ══════════════════ */
-Game.on(() => {
-  renderChapterList();
-  renderEndings();
-});
-
-/* ══════════════════ 初始化 ══════════════════ */
-S.attrs = freshAttrs();
-renderHud();
-
-const loaded = load();
-if(!loaded){
-  if(Game.order.length) startChapter(Game.order[0]);
 }
-renderChapterList();
-renderEndings();
 
+/** 标记当前 beat 为已读 */
+function markSeen(){
+  const beat = App.currentBeat;
+  if (!beat || !App.chapter) return;
+  if (beat.id != null){
+    App.seen[App.chapter.id + ':' + beat.id] = true;
+  }
+}
 
+/** 推进到下一个 beat */
+function advance(){
+  const ch = App.chapter;
+  if (!ch) return;
+  const beats = ch.beats || [];
+  const beat = beats[App.beatIndex];
 
-/* ════════════════════════════════════════════════════════════
-   ★ 第一章 · 合租事故
-   （在工坊里重新导入同一 id 即可覆盖更新）
-   ════════════════════════════════════════════════════════════ */
-Game.defineChapter({
-  id: 'ch01',
-  order: 1,
-  title: '第一章 · 合租事故',
-  subtitle: '新租屋 · 一个金灿灿的脑袋 · 一扇不肯关上的窗',
-  start: 'open',
+  markSeen();
 
-  endings: {
-    e_ch1: { name: '第一章 · 完', desc: '合租生活的第一周结束了。有些事情在变，有些还没。下一章，还在写。' }
+  let ni = App.beatIndex + 1;
+  if (beat && beat.next){
+    const idx = beats.findIndex(b => b.id === beat.next);
+    if (idx >= 0) ni = idx;
+  }
+
+  App.beatIndex = ni;
+  saveProgress();
+  renderBeat();
+}
+
+/** 章节结束 */
+function finishChapter(){
+  const ch = App.chapter;
+  if (!ch) return;
+
+  if (App.mode === 'side'){
+    // 副本结束
+    if (App.sideId){
+      store.set(sideSaveKey(App.sideId), {
+        beatIndex: 0,
+        applied: App.appliedSide,
+        finished: true,
+        updated: Date.now()
+      });
+    }
+    openModal({
+      title:'副本结束',
+      body:'「' + esc(ch.title) + '」已完成。\n副本进度不会影响主线。',
+      buttons:[
+        { text:'返回副本列表', cls:'btn-primary', act: function(){
+          closeModal(); exitToSideList();
+        }}
+      ]
+    });
+    return;
+  }
+
+  if (App.mode === 'replay'){
+    openModal({
+      title:'重玩结束',
+      body:'本章重玩完毕。主线进度未发生改变。',
+      buttons:[
+        { text:'返回主页', cls:'btn-primary', act: function(){ closeModal(); exitToHome(); }}
+      ]
+    });
+    return;
+  }
+
+  // 主线
+  const next = findNextChapter(ch.order);
+
+  if (next){
+    openModal({
+      title:'本章完 · ' + esc(ch.title),
+      body:'下一章已就绪：<br><b>' + esc(next.title) + '</b>',
+      buttons:[
+        { text:'稍后再说', cls:'', act: function(){
+          closeModal(); exitToHome();
+        }},
+        { text:'进入下一章', cls:'btn-primary', act: function(){
+          closeModal();
+          beginChapter(next);
+        }}
+      ]
+    });
+  } else {
+    openModal({
+      title:'本章完 · ' + esc(ch.title),
+      body:'目前还没有后续章节。<br>你可以打开<b>代码工坊</b>，导入新的章节 JSON，然后回到主页点击「继续剧情」即可无缝接续。',
+      buttons:[
+        { text:'打开代码工坊', cls:'', act: function(){
+          closeModal(); showPage('page-workshop'); renderWorkshop();
+        }},
+        { text:'返回主页', cls:'btn-primary', act: function(){
+          closeModal(); exitToHome();
+        }}
+      ]
+    });
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   历史记录
+   --------------------------------------------------------------------------- */
+function pushHistory(item){
+  App.history.push(item);
+  if (App.history.length > 400) App.history.shift();
+  if (App.mode === 'main') saveMain();
+}
+
+/* ---------------------------------------------------------------------------
+   自动播放 / 跳过
+   --------------------------------------------------------------------------- */
+function scheduleAuto(){
+  clearTimeout(App.autoTimer);
+  if (!App.autoMode) return;
+  const beat = App.currentBeat;
+  if (!beat) return;
+  if (beat.type === 'choice' || beat.type === 'chapter_end') return;
+  App.autoTimer = setTimeout(function(){
+    if (App.autoMode) advance();
+  }, 1400);
+}
+
+function toggleAuto(){
+  App.autoMode = !App.autoMode;
+  $('#gBtnAuto').classList.toggle('on', App.autoMode);
+  if (App.autoMode){
+    App.skipMode = false;
+    $('#gBtnSkip').classList.remove('on');
+    toast('自动播放：开');
+    if (!App.typing) scheduleAuto();
+  } else {
+    toast('自动播放：关');
+    clearTimeout(App.autoTimer);
+  }
+}
+
+function toggleSkip(){
+  App.skipMode = !App.skipMode;
+  $('#gBtnSkip').classList.toggle('on', App.skipMode);
+  if (App.skipMode){
+    App.autoMode = false;
+    $('#gBtnAuto').classList.remove('on');
+    toast('跳过已读：开（仅跳过已读内容）');
+    runSkip();
+  } else {
+    toast('跳过已读：关');
+  }
+}
+
+/** 跳过循环：仅跳过已读的 beat */
+function runSkip(){
+  if (!App.skipMode) return;
+  const ch = App.chapter;
+  if (!ch) return;
+  const beat = (ch.beats||[])[App.beatIndex];
+  if (!beat) return;
+
+  if (beat.type === 'choice' || beat.type === 'chapter_end'){
+    App.skipMode = false;
+    $('#gBtnSkip').classList.remove('on');
+    return;
+  }
+
+  const isSeen = App.seen[ch.id + ':' + beat.id];
+  if (!isSeen){
+    App.skipMode = false;
+    $('#gBtnSkip').classList.remove('on');
+    toast('已跳到未读内容');
+    return;
+  }
+
+  advance();
+  setTimeout(runSkip, 60);
+}
+
+/* ============================================================================
+   =========================  PART 7 · 彩蛋副本  ==============================
+   ============================================================================ */
+
+function sideUnlocked(side){
+  const u = side.unlock;
+  if (!u) return true;
+  if (typeof u.affectionMin === 'number' && getAffection() < u.affectionMin) return false;
+  if (u.chapterId){
+    const idx = String(u.chapterId);
+    const done = Object.keys(App.seen || {}).some(k => k.indexOf(idx + ':') === 0);
+    if (!done) return false;
+  }
+  return true;
+}
+
+function playSide(id){
+  const side = DB.sides[id];
+  if (!side){ toast('副本不存在', 'err'); return; }
+  if (!sideUnlocked(side)){ toast('尚未解锁该副本', 'warn'); return; }
+
+  const save = store.get(sideSaveKey(id), null);
+
+  App.mode = 'side';
+  App.sideId = id;
+  App.chapter = side;
+  App.beatIndex = (save && typeof save.beatIndex === 'number') ? save.beatIndex : 0;
+  App.appliedSide = (save && save.applied) ? save.applied : {};
+
+  if (App.beatIndex >= (side.beats||[]).length) App.beatIndex = 0;
+
+  showPage('page-game');
+  renderBeat();
+}
+
+function exitToSideList(){
+  App.mode = 'main';
+  App.sideId = null;
+  App.chapter = null;
+  showPage('page-side');
+  renderSides();
+}
+
+/* ============================================================================
+   =========================  PART 8 · 页面渲染  ==============================
+   ============================================================================ */
+
+function showPage(id){
+  const pages = $$('.page');
+  pages.forEach(function(p){
+    p.classList.remove('active');
+  });
+  const target = $('#' + id);
+  if (target) target.classList.add('active');
+  App.page = id;
+
+  if (id === 'page-qna') renderQna();
+  if (id === 'page-info') renderInfo();
+  if (id === 'page-side') renderSides();
+  if (id === 'page-workshop') renderWorkshop();
+}
+
+function exitToHome(){
+  App.mode = 'main';
+  showPage('page-home');
+  renderHome();
+}
+
+function renderHome(){
+  const btnContinue = $('#btnContinue');
+  if (!mainSave.started){
+    btnContinue.textContent = '继 续 剧 情';
+    btnContinue.setAttribute('disabled','disabled');
+  } else {
+    btnContinue.removeAttribute('disabled');
+    const ch = DB.chapters[mainSave.chapterId];
+    btnContinue.textContent = ch ? ('继 续：' + ch.title.slice(0, 10) + '…') : '继 续 剧 情';
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Q&A 页面
+   --------------------------------------------------------------------------- */
+function renderQna(){
+  const all = Object.keys(DB.qna).map(k => DB.qna[k]);
+  // 分类
+  const cats = ['全部'];
+  all.forEach(function(q){
+    const c = q.category || '未分类';
+    if (cats.indexOf(c) === -1) cats.push(c);
+  });
+
+  const tabs = $('#qnaTabs');
+  tabs.innerHTML = '';
+  cats.forEach(function(c){
+    const b = document.createElement('button');
+    b.className = 'tab' + (App.qnaFilter === c ? ' active' : '');
+    b.textContent = c;
+    b.onclick = function(){ App.qnaFilter = c; renderQna(); };
+    tabs.appendChild(b);
+  });
+
+  const kw = ($('#qnaSearch').value || '').trim().toLowerCase();
+  const aff = getAffection();
+
+  const list = all
+    .filter(q => App.qnaFilter === '全部' || (q.category||'未分类') === App.qnaFilter)
+    .filter(function(q){
+      if (!kw) return true;
+      const s = ((q.question||'') + (q.answer||'') + (q.category||'')).toLowerCase();
+      return s.indexOf(kw) >= 0;
+    })
+    .sort(function(a,b){ return (a.unlock||0) - (b.unlock||0); });
+
+  const wrap = $('#qnaList');
+  wrap.innerHTML = '';
+
+  if (!list.length){
+    wrap.innerHTML = '<div class="empty-tip" style="grid-column:1/-1"><span class="big">🦊</span>这里还空着。<br>去代码工坊导入 Q&A 吧。</div>';
+    return;
+  }
+
+  list.forEach(function(q){
+    const unlocked = aff >= (q.unlock || 0);
+    const card = document.createElement('div');
+    card.className = 'card' + (unlocked ? ' clickable' : ' locked');
+
+    let html =
+      '<div class="card-head">' +
+        '<div class="card-title">' + esc(q.question || '（无题）') + '</div>' +
+        '<div class="card-cat">' + esc(q.category || '未分类') + '</div>' +
+      '</div>';
+
+    if (!unlocked){
+      html += '<div class="card-lock">🔒 好感度 ' + (q.unlock||0) + ' 解锁（当前 ' + aff + '）</div>';
+    } else {
+      html += '<div class="card-lock" style="color:var(--cash)">🔓 已解锁 · 点击查看回答</div>';
+      html += '<div class="card-answer" style="display:none">' +
+                '<span class="ans-label">CASH SAYS</span>' +
+                esc(q.answer || '……').replace(/\n/g,'<br>') +
+              '</div>';
+    }
+
+    card.innerHTML = html;
+
+    if (unlocked){
+      card.onclick = function(){
+        const a = $('.card-answer', card);
+        if (!a) return;
+        const open = a.style.display !== 'none';
+        a.style.display = open ? 'none' : 'block';
+      };
+    }
+    wrap.appendChild(card);
+  });
+}
+
+/* ---------------------------------------------------------------------------
+   角色信息页面
+   --------------------------------------------------------------------------- */
+function renderInfo(){
+  const body = $('#infoBody');
+  const aff = getAffection();
+
+  // 标签状态
+  $$('#infoTabs .tab').forEach(function(t){
+    t.classList.toggle('active', t.dataset.itab === App.infoTab);
+  });
+
+  // ---- 成就 ----
+  if (App.infoTab === 'ach'){
+    const list = DB.achievements.length ? DB.achievements : DEFAULT_ACHIEVEMENTS;
+    let h = '';
+    list.sort((a,b)=>a.unlock-b.unlock).forEach(function(a){
+      const got = (mainSave.achievements || []).indexOf(a.id) >= 0;
+      h += '<div class="ach-item' + (got ? '' : ' locked') + '">' +
+             '<div class="ach-icon">' + (got ? (a.icon||'🏆') : '🔒') + '</div>' +
+             '<div><div class="ach-t">' + esc(a.title) + '</div>' +
+             '<div class="ach-d">' + esc(a.desc) + '</div></div>' +
+           '</div>';
+    });
+    body.innerHTML = h || '<div class="empty-tip">暂无成就</div>';
+    return;
+  }
+
+  // ---- 人际关系 ----
+  if (App.infoTab === 'rel'){
+    const list = Object.keys(DB.relations).map(k=>DB.relations[k])
+                  .sort((a,b)=>(a.unlock||0)-(b.unlock||0));
+    if (!list.length){
+      body.innerHTML = '<div class="empty-tip"><span class="big">🕸️</span>还没有人际关系数据。<br>去代码工坊导入吧。</div>';
+      return;
+    }
+    let h = '<div class="rel-graph">';
+    list.forEach(function(r){
+      const ok = aff >= (r.unlock||0);
+      if (!ok){
+        h += '<div class="rel-node" style="opacity:.55;filter:grayscale(.5)">' +
+               '<div class="avatar">🔒</div>' +
+               '<div class="rname">？？？</div>' +
+               '<div class="rrole">好感度 ' + (r.unlock||0) + ' 解锁</div>' +
+             '</div>';
+      } else {
+        h += '<div class="rel-node">' +
+               '<div class="avatar">' + esc((r.name||'?').charAt(0)) + '</div>' +
+               '<div class="rname">' + esc(r.name) + '</div>' +
+               '<div class="rrole">' + esc(r.role||'') + '</div>' +
+               '<div class="rdesc">' + esc(r.desc||'').replace(/\n/g,'<br>') + '</div>' +
+             '</div>';
+      }
+    });
+    h += '</div>';
+    body.innerHTML = h;
+    return;
+  }
+
+  // ---- 卡什档案 / 卡什的东西 / 我的信息 ----
+  let target = 'cash';
+  let group = '档案';
+  if (App.infoTab === 'items'){ target = 'cash'; group = 'item'; }
+  if (App.infoTab === 'mott'){  target = 'mott'; group = '档案'; }
+
+  const list = Object.keys(DB.charinfo).map(k=>DB.charinfo[k])
+                .filter(function(c){
+                  if (c.target !== target) return false;
+                  const g = c.group || '档案';
+                  return g === group;
+                })
+                .sort((a,b)=>(a.unlock||0)-(b.unlock||0));
+
+  if (!list.length){
+    const tips = {
+      cash:'卡什的档案还空着。去代码工坊导入 charinfo（target: "cash"）吧。',
+      items:'卡什的小物件还没收集。导入 charinfo（target:"cash", group:"item"）吧。',
+      mott:'你的档案是空白的。<br>去代码工坊导入 charinfo（target: "mott"）来补全自己。'
+    };
+    body.innerHTML = '<div class="empty-tip"><span class="big">📄</span>' + (tips[App.infoTab] || '暂无数据') + '</div>';
+    return;
+  }
+
+  let h = '<div class="card-grid">';
+  list.forEach(function(c){
+    const ok = aff >= (c.unlock||0);
+    h += '<div class="card' + (ok ? '' : ' locked') + '">' +
+           '<div class="card-head">' +
+             '<div class="card-title">' + esc(c.title || '未命名') + '</div>' +
+             '<div class="card-cat">' + (ok ? '已解锁' : '🔒') + '</div>' +
+           '</div>';
+    if (ok){
+      h += '<div class="card-desc">' + esc(c.content||'').replace(/\n/g,'<br>') + '</div>';
+    } else {
+      h += '<div class="card-lock">🔒 好感度 ' + (c.unlock||0) + ' 解锁（当前 ' + aff + '）</div>';
+    }
+    h += '</div>';
+  });
+  h += '</div>';
+  body.innerHTML = h;
+}
+
+/* ---------------------------------------------------------------------------
+   彩蛋副本列表
+   --------------------------------------------------------------------------- */
+function renderSides(){
+  const list = Object.keys(DB.sides).map(k=>DB.sides[k]);
+  const wrap = $('#sideList');
+  wrap.innerHTML = '';
+
+  if (!list.length){
+    wrap.innerHTML = '<div class="empty-tip" style="grid-column:1/-1"><span class="big">🎁</span>还没有彩蛋副本。<br>去代码工坊导入 side 数据吧。</div>';
+    return;
+  }
+
+  list.forEach(function(s){
+    const ok = sideUnlocked(s);
+    const save = store.get(sideSaveKey(s.id), null);
+    const played = save && save.beatIndex > 0;
+    const finished = save && save.finished;
+
+    const card = document.createElement('div');
+    card.className = 'card' + (ok ? ' clickable' : ' locked');
+
+    let h = '<div class="card-head">' +
+              '<div class="card-title">' + esc(s.title || '未命名副本') + '</div>' +
+              '<div class="card-cat">' + (finished ? '已完成' : (played ? '进行中' : (ok ? '可游玩' : '🔒'))) + '</div>' +
+            '</div>';
+
+    h += '<div class="card-desc">' + esc(s.intro || '') + '</div>';
+
+    if (!ok){
+      const u = s.unlock || {};
+      h += '<div class="card-lock">🔒 好感度 ' + (u.affectionMin||0) + ' 解锁（当前 ' + getAffection() + '）</div>';
+    } else {
+      h += '<div class="ws-actions" style="margin-top:12px">' +
+             '<button class="btn sm btn-primary" data-play="' + esc(s.id) + '">' + (played && !finished ? '继续' : '游玩') + '</button>' +
+             (played ? '<button class="btn sm" data-reset="' + esc(s.id) + '">清空进度</button>' : '') +
+           '</div>';
+    }
+
+    card.innerHTML = h;
+    wrap.appendChild(card);
+  });
+
+  // 事件绑定
+  $$('#sideList [data-play]').forEach(function(b){
+    b.onclick = function(e){ e.stopPropagation(); playSide(b.dataset.play); };
+  });
+  $$('#sideList [data-reset]').forEach(function(b){
+    b.onclick = function(e){
+      e.stopPropagation();
+      store.del(sideSaveKey(b.dataset.reset));
+      toast('已清空该副本进度');
+      renderSides();
+    };
+  });
+}
+
+/* ============================================================================
+   =========================  PART 9 · 代码工坊  ==============================
+   ============================================================================ */
+
+const WS_TYPES = [
+  { key:'chapter',  label:'章节',        storeKey:'chapters'  },
+  { key:'qna',      label:'羁绊问答',    storeKey:'qna'       },
+  { key:'charinfo', label:'角色档案',    storeKey:'charinfo'  },
+  { key:'relation', label:'人际关系',    storeKey:'relations' },
+  { key:'side',     label:'彩蛋副本',    storeKey:'sides'     },
+  { key:'affection_levels', label:'好感度等级表', storeKey:'levels' }
+];
+
+let wsCurrent = 'chapter';
+
+function renderWorkshop(){
+  const tabs = $('#wsTabs');
+  tabs.innerHTML = '';
+  WS_TYPES.forEach(function(t){
+    const b = document.createElement('button');
+    b.className = 'tab' + (wsCurrent === t.key ? ' active' : '');
+    b.textContent = t.label;
+    b.onclick = function(){
+      wsCurrent = t.key;
+      renderWorkshop();
+    };
+    tabs.appendChild(b);
+  });
+
+  const hints = {
+    chapter:'粘贴章节 JSON（单个对象或数组）。必填：type/id/title/order/beats',
+    qna:'粘贴 Q&A JSON。必填：type/id/question/answer，可选 category/unlock',
+    charinfo:'粘贴档案 JSON。必填：type/id/target("cash"|"mott")/title/content，可选 group("档案"|"item")/unlock',
+    relation:'粘贴人际关系 JSON。必填：type/id/name，可选 role/desc/unlock',
+    side:'粘贴彩蛋副本 JSON。必填：type/id/title/beats，可选 intro/unlock',
+    affection_levels:'粘贴等级表 JSON：{ "type":"affection_levels", "levels":[ {min,max,name}, ... ] }'
+  };
+  $('#wsHint').textContent = hints[wsCurrent] || '粘贴 JSON';
+
+  // 统计
+  const stats = [
+    '章节：' + Object.keys(DB.chapters).length + ' 章',
+    '羁绊问答：' + Object.keys(DB.qna).length + ' 条',
+    '角色档案：' + Object.keys(DB.charinfo).length + ' 条',
+    '人际关系：' + Object.keys(DB.relations).length + ' 条',
+    '彩蛋副本：' + Object.keys(DB.sides).length + ' 个',
+    '好感度等级：' + DB.levels.length + ' 级',
+    '当前好感度：' + getAffection() + '（' + getLevelName(getAffection()) + '）'
+  ];
+  $('#wsStats').innerHTML = stats.map(function(s){ return '· ' + esc(s); }).join('<br>');
+}
+
+/* ---------------------------- 校验器 ---------------------------- */
+const VALIDATORS = {
+  chapter: function(d){
+    const e = [];
+    if (!d.id) e.push('缺少字段 id');
+    if (!d.title) e.push('缺少字段 title');
+    if (typeof d.order !== 'number') e.push('缺少字段 order（必须是数字）');
+    if (!Array.isArray(d.beats)) e.push('缺少字段 beats（必须是数组）');
+    else {
+      d.beats.forEach(function(b, i){
+        if (!b || typeof b !== 'object'){ e.push('beats[' + i + '] 不是对象'); return; }
+        if (!b.type) e.push('beats[' + i + '] 缺少 type');
+        if (b.type === 'choice' && !Array.isArray(b.options)) e.push('beats[' + i + '] 是 choice 但缺少 options 数组');
+      });
+    }
+    return e;
   },
+  qna: function(d){
+    const e = [];
+    if (!d.id) e.push('缺少字段 id');
+    if (!d.question) e.push('缺少字段 question');
+    if (d.answer == null) e.push('缺少字段 answer');
+    if (d.unlock != null && typeof d.unlock !== 'number') e.push('unlock 必须是数字');
+    return e;
+  },
+  charinfo: function(d){
+    const e = [];
+    if (!d.id) e.push('缺少字段 id');
+    if (!d.target) e.push('缺少字段 target（"cash" 或 "mott"）');
+    if (!d.title) e.push('缺少字段 title');
+    if (d.content == null) e.push('缺少字段 content');
+    if (d.unlock != null && typeof d.unlock !== 'number') e.push('unlock 必须是数字');
+    return e;
+  },
+  relation: function(d){
+    const e = [];
+    if (!d.id) e.push('缺少字段 id');
+    if (!d.name) e.push('缺少字段 name');
+    if (d.unlock != null && typeof d.unlock !== 'number') e.push('unlock 必须是数字');
+    return e;
+  },
+  side: function(d){
+    const e = [];
+    if (!d.id) e.push('缺少字段 id');
+    if (!d.title) e.push('缺少字段 title');
+    if (!Array.isArray(d.beats)) e.push('缺少字段 beats（必须是数组）');
+    else {
+      d.beats.forEach(function(b, i){
+        if (!b || !b.type) e.push('beats[' + i + '] 缺少 type');
+      });
+    }
+    return e;
+  },
+  affection_levels: function(d){
+    const e = [];
+    if (!Array.isArray(d.levels)) e.push('缺少字段 levels（必须是数组）');
+    else {
+      d.levels.forEach(function(l, i){
+        if (typeof l.min !== 'number') e.push('levels[' + i + '] 缺少 min');
+        if (typeof l.max !== 'number') e.push('levels[' + i + '] 缺少 max');
+        if (!l.name) e.push('levels[' + i + '] 缺少 name');
+      });
+    }
+    return e;
+  }
+};
 
-  nodes: {
+/* ---------------------------- 导入逻辑 ---------------------------- */
+function importJSON(type, rawText){
+  let parsed;
+  try{
+    parsed = JSON.parse(rawText);
+  }catch(err){
+    return { ok:false, errors:['JSON 解析失败：' + err.message] };
+  }
 
-/* ══════════ 序章 ══════════ */
-open: {
-  steps: [
-    { t:'scene', x:'序章 · 门锁转动' },
-    { t:'n', x:'门锁转动。' },
-    { t:'n', x:'你抬起头，看见一个金灿灿的脑袋和一副大得离谱的墨镜。来人比你想象中高一点，金发，皮肤在白人里算偏白的，有很淡的雀斑。嘴角右下方有一颗痣，笑起来时跟着上扬。' },
-    { t:'n', x:'他把行李箱往门边一踢，张开双臂。' },
-    { t:'s', who:'卡什', x:'Yo! You must be my roommate. Wow, nice to meet you!', cn:'（哟！你就是我室友吧。哇，幸会幸会！）' },
-    { t:'n', x:'他伸手。你没接。' },
-    { t:'n', x:'他目光从你发顶扫到脚踝，最后停在你脸上，嘴角弧度更大了。' },
-    { t:'s', who:'卡什', x:"Damn, you're cute. Is my roommate an angel?", cn:'（靠，你长得真可爱。我室友是天使吗？）' },
-    { t:'n', x:'你面无表情地看着他。他完全没意识到你在无语，甚至往前凑了一步。' },
-    { t:'s', who:'卡什', x:'Cash. Cash Rockwell. You can call me—', cn:'（卡什。卡什·洛克威尔。你可以叫我——）' },
-    { t:'n', x:'他压低声音。' },
-    { t:'s', who:'卡什', x:'—yours.', cn:'（——你的。）' },
-    { t:'n', x:'你沉默三秒。' },
-    { t:'c', x:'【做出选择】', o:[
-      { l:'用中文说：“滚。”',                   to:'p_a', fx:{ aff:5,  dom:0,  irr:-10 } },
-      { l:'用英语说：“你墨镜摘了再跟我说话。”',   to:'p_b', fx:{ aff:10, dom:5,  irr:-5  } },
-      { l:'直接转身回屋，关门。',                 to:'p_c', fx:{ aff:5,  dom:-5, irr:-15 } }
-    ]}
-  ]
-},
+  const items = Array.isArray(parsed) ? parsed : [parsed];
+  if (!items.length) return { ok:false, errors:['内容为空'] };
 
-p_a: {
-  steps: [
-    { t:'n', x:'你开口，字正腔圆。' },
-    { t:'s', who:'你', x:'滚。' },
-    { t:'n', x:'卡什歪了歪头，墨镜滑下来一点，露出半只困惑的蓝眼睛。' },
-    { t:'s', who:'卡什', x:"What? Sorry, I don't—I don't speak... that.", cn:'（什么？抱歉，我不——我不说……那个。）' },
-    { t:'n', x:'他指了指你，又指了指自己，比划了半天，最后露出一个灿烂的笑。' },
-    { t:'s', who:'卡什', x:'But I like your voice. Say it again?', cn:'（但我喜欢你的声音。再说一遍？）' },
-    { t:'n', x:'你闭嘴了。' },
-    { t:'n', x:'他完全没被冒犯到，反而因为你的沉默更加兴奋，绕着你转了半圈，像在观察一件新玩具。' },
-    { t:'s', who:'卡什', x:"Okay, okay. I'll learn. Teach me. What does 'gun' mean?", cn:'（好吧好吧。我会学的。教教我。“滚”是什么意思？）' },
-    { t:'n', x:'你看着他兴致勃勃的脸，第一次产生了搬家的念头。' }
-  ],
-  next: 's1'
-},
+  // 特殊类型：affection_levels（整体替换）
+  if (type === 'affection_levels'){
+    const errs = VALIDATORS.affection_levels(parsed.levels ? parsed : items[0]);
+    if (errs.length) return { ok:false, errors:errs };
+    const target = parsed.levels ? parsed : items[0];
+    store.set(K.levels, { type:'affection_levels', levels: target.levels });
+    DB.levels = target.levels;
+    return { ok:true, added:0, updated:1, msg:'好感度等级表已整体覆盖（' + target.levels.length + ' 级）' };
+  }
 
-p_b: {
-  steps: [
-    { t:'n', x:'你用英语开口，语速平缓。' },
-    { t:'s', who:'你', x:'Take off your sunglasses before you talk to me.' },
-    { t:'n', x:'卡什的笑容僵了零点几秒。' },
-    { t:'n', x:'他的手无意识地抬了一下，碰到墨镜边缘，又放下了。这个动作很快，但你看见了。' },
-    { t:'s', who:'卡什', x:'Ha. Why? You wanna see my eyes that bad?', cn:'（哈。为什么？你就那么想看我的眼睛？）' },
-    { t:'n', x:'他语气还是轻浮的，但刚才那一瞬间的停顿骗不了人。你盯着他，他盯着你，墨镜后面的表情看不太清。' },
-    { t:'s', who:'卡什', x:'...Maybe later. When you earn it.', cn:'（……也许以后吧。等你配得上的时候。）' },
-    { t:'n', x:'他扯开话题，开始抱怨飞机餐难吃，抱怨房东给的钥匙太旧，抱怨这个城市太热。你没有追问。' },
-    { t:'n', x:'但你知道了一件事：那副墨镜不只是装饰。' }
-  ],
-  next: 's1'
-},
+  const validator = VALIDATORS[type];
+  const allErrors = [];
+  const validItems = [];
 
-p_c: {
-  steps: [
-    { t:'n', x:'你转身，进屋，关门。动作一气呵成。' },
-    { t:'n', x:'门外安静了两秒。' },
-    { t:'n', x:'然后传来敲门声。' },
-    { t:'s', who:'卡什', x:"Hey—hey! Come on, don't do me like that!", cn:'（喂——喂！别这样对我啊！）' },
-    { t:'n', x:'你没理。敲门声持续了三十秒，然后停了。' },
-    { t:'n', x:'你以为结束了。' },
-    { t:'n', x:'五分钟后，你的手机响了。陌生号码。你划开。' },
-    { t:'s', who:'卡什', x:"Hi. It's me. I got your number from the landlord.", cn:'（嗨。是我。我从房东那儿要到了你的号码。）' },
-    { t:'n', x:'电话那头传来他得意的笑声。' },
-    { t:'s', who:'卡什', x:"You can't get rid of me that easy, roomie.", cn:'（你可没那么容易甩掉我，室友。）' },
-    { t:'n', x:'你挂了电话。' },
-    { t:'n', x:'一分钟后，短信进来：一张他对着你房门自拍的照片，比着剪刀手，配文 "neighbor of the year"。' },
-    { t:'n', x:'你把手机扣在桌上。门外传来他哼歌的声音，调子跑得离谱。' }
-  ],
-  next: 's1'
-},
+  items.forEach(function(it, idx){
+    if (!it || typeof it !== 'object'){
+      allErrors.push('第 ' + (idx+1) + ' 条不是对象');
+      return;
+    }
+    // 若 item 未带 type，按当前类型补齐
+    if (!it.type) it.type = type;
+    const errs = validator(it);
+    if (errs.length){
+      errs.forEach(function(e){ allErrors.push('第 ' + (idx+1) + ' 条：' + e); });
+    } else {
+      validItems.push(it);
+    }
+  });
 
-/* ══════════ 场景一 ══════════ */
-s1: {
-  steps: [
-    { t:'scene', x:'场景一 · 早餐危机' },
-    { t:'n', x:'早上七点。' },
-    { t:'n', x:'你走出房间，发现卡什穿着睡袍霸占厨房，试图用平底锅煎一个黑色的东西。' },
-    { t:'s', who:'卡什', x:'Morning~', cn:'（早啊~）' },
-    { t:'n', x:'他听到动静转头，墨镜没戴，眯着眼辨认你。' },
-    { t:'s', who:'卡什', x:'Xiao Heng? That you? I made breakfast—', cn:'（小桁？是你吗？我做了早餐——）' },
-    { t:'n', x:'他低头看锅。' },
-    { t:'s', who:'卡什', x:'Oh. It was alive just now.', cn:'（哦。它刚刚还活着。）' },
-    { t:'n', x:'你看着那团焦黑物体，又看了看他被油溅到后缩手的怂样。他的蓝眼睛没有聚焦，在厨房的光线里显得有点茫然。他伸手想拿盐罐，手指在台面上摸了两下，没摸到，又摸了两下。' },
-    { t:'n', x:'你注意到他的动作。他自己似乎没意识到哪里不对，最后凭感觉抓到了盐罐，得意地晃了晃。' },
-    { t:'c', x:'【做出选择】', o:[
-      { l:'沉默地夺过锅铲，三分钟重做一份完美的煎蛋。', to:'s1_a', fx:{ aff:15, dom:5,  irr:5   } },
-      { l:'用英语嘲讽：“这就是美国饮食文化？”',        to:'s1_b', fx:{ aff:5,  dom:0,  irr:-5  } },
-      { l:'拿出手机开始点外卖，只点一人份。',            to:'s1_c', fx:{ aff:5,  dom:10, irr:-10 } }
-    ]}
-  ]
-},
+  if (allErrors.length){
+    return { ok:false, errors: allErrors };
+  }
 
-s1_a: {
-  steps: [
-    { t:'n', x:'你走过去，从他手里拿走锅铲。' },
-    { t:'n', x:'他愣了一下。' },
-    { t:'s', who:'卡什', x:'Hey—', cn:'（喂——）' },
-    { t:'n', x:'你不管他，开火，倒油，打蛋。三分钟，两个完美的煎蛋出锅，边缘微焦，蛋黄流心。你把它推到他面前。' },
-    { t:'n', x:'卡什没动。他眯着眼看了盘子两秒，又看向你。' },
-    { t:'s', who:'卡什', x:'...You just made me breakfast.', cn:'（……你刚给我做了早餐。）' },
-    { t:'n', x:'你已经在洗锅了。' },
-    { t:'s', who:'卡什', x:'Dude. Duuude. Marry me.', cn:'（哥们。哥们。嫁给我吧。）' },
-    { t:'n', x:'你手一抖，差点把锅扔了。' },
-    { t:'n', x:'他哈哈大笑，叉起一个煎蛋塞进嘴里，含糊不清地继续说。' },
-    { t:'s', who:'卡什', x:"I'm serious. This is the best thing I've eaten since I got here.", cn:'（我是认真的。这是我来了之后吃过最好吃的东西。）' },
-    { t:'n', x:'你背对着他，没有回答。但你听见他吃得很认真。盘子被刮得干干净净。吃完之后他把盘子放进水槽，站在你旁边，欲言又止。' },
-    { t:'s', who:'卡什', x:'...Do you cook every morning?', cn:'（……你每天早上都做饭吗？）' },
-    { t:'n', x:'你没回答。他也没走，就靠在料理台边上看你洗碗。你洗完碗转身，差点撞上他。他离得很近，墨镜不知道什么时候戴上了，你看见自己的影子映在镜片上。' },
-    { t:'s', who:'卡什', x:'Just checking.', cn:'（就看看。）' },
-    { t:'n', x:'他笑着退开，回了房间。' }
-  ],
-  next: 's2'
-},
+  const t = WS_TYPES.filter(function(x){ return x.key === type; })[0];
+  const bucket = DB[t.storeKey];
+  let added = 0, updated = 0;
+  const names = [];
 
-s1_b: {
-  steps: [
-    { t:'n', x:'你靠在门框上，用英语开口。' },
-    { t:'s', who:'你', x:'So this is American cuisine?' },
-    { t:'n', x:'卡什抬头，眯着眼看你，然后夸张地捂住胸口。' },
-    { t:'s', who:'卡什', x:'Ow. That hurt. That hurt my soul.', cn:'（哎哟。好痛。伤到我的灵魂了。）' },
-    { t:'n', x:'他把焦黑的煎蛋举起来，对着光端详了一下。' },
-    { t:'s', who:'卡什', x:"Okay, fair. It's a crime scene. But in my defense, the pan is too small.", cn:'（好吧，有道理。这是案发现场。但为我辩护一下，这锅太小了。）' },
-    { t:'n', x:'他理直气壮地指着锅，又指了指自己。' },
-    { t:'s', who:'卡什', x:"And I'm too big.", cn:'（而我太大了。）' },
-    { t:'n', x:'你面无表情。他笑嘻嘻地把焦蛋倒进垃圾桶，凑过来看你的表情。他靠得太近了，你往后退了半步，他跟着往前半步。' },
-    { t:'s', who:'卡什', x:'You smiled. Just now. I saw it.', cn:'（你笑了。刚刚。我看到了。）' },
-    { t:'n', x:'你没笑。但他很笃定。' },
-    { t:'s', who:'卡什', x:"You're a tough crowd, Xiao Heng. But I'll get you.", cn:'（你可真难讨好，小桁。但我会拿下你的。）' },
-    { t:'n', x:'他转身去翻冰箱，翻了两下没找到东西，又回头问你。' },
-    { t:'s', who:'卡什', x:"Where's the... uh... the thing. The cold thing. Milk?", cn:'（那个……呃……那个东西在哪。冰的那个。牛奶？）' },
-    { t:'n', x:'你指了指冰箱上层。他打开，牛奶就在正中间。他拿起来，对着嘴灌了一口，完全没找杯子。' }
-  ],
-  next: 's2'
-},
+  validItems.forEach(function(it){
+    if (bucket[it.id]) updated++; else added++;
+    bucket[it.id] = it;
+    names.push(it.title || it.question || it.name || it.id);
+  });
 
-s1_c: {
-  steps: [
-    { t:'n', x:'你拿出手机，打开外卖软件。卡什凑过来。' },
-    { t:'s', who:'卡什', x:'Ooh, what are we ordering?', cn:'（哦哦，我们点什么？）' },
-    { t:'n', x:'你没回答。下单，一份。收起手机。' },
-    { t:'n', x:'卡什等了两秒。' },
-    { t:'s', who:'卡什', x:"...Where's mine?", cn:'（……我的呢？）' },
-    { t:'n', x:'你看了他一眼，淡淡地开口。' },
-    { t:'s', who:'你', x:'你说你做了早餐。' },
-    { t:'n', x:'卡什张了张嘴，又闭上，低头看了看那团焦黑物体。' },
-    { t:'s', who:'卡什', x:"That's cold. That's really cold.", cn:'（太狠了。真的太狠了。）' },
-    { t:'n', x:'但他没走。他搬了把椅子坐在你对面，撑着下巴看你。' },
-    { t:'s', who:'卡什', x:"Fine. I'll just watch you eat. I'm good at watching.", cn:'（行。我就看你吃。我很擅长看。）' },
-    { t:'n', x:'外卖到了。你在他灼热的注视下吃完了整份饭。他全程没说话，但那个笑容一直挂在脸上。你放下筷子的瞬间，他开口。' },
-    { t:'s', who:'卡什', x:"You eat fast. That's kind of hot.", cn:'（你吃得真快。有点辣。）' },
-    { t:'n', x:'你起身就走。他在后面喊。' },
-    { t:'s', who:'卡什', x:"What? It's a compliment!", cn:'（干嘛？这是夸奖！）' },
-    { t:'n', x:'你回了房间。过了一会儿，你听见他在客厅翻箱倒柜，然后是一声闷响，像是什么东西掉了。你开门看了一眼，他蹲在地上捡散落一地的餐具，墨镜歪了，嘴里嘟囔着什么。他抬头看见你，立刻露出一个没事人的笑。' },
-    { t:'s', who:'卡什', x:'All good. All good.', cn:'（没事。没事。）' },
-    { t:'n', x:'你关上门。外面又传来一声轻响。' }
-  ],
-  next: 's2'
-},
+  store.set(K[t.storeKey], bucket);
 
-/* ══════════ 场景二 ══════════ */
-s2: {
-  steps: [
-    { t:'scene', x:'场景二 · 客厅日常' },
-    { t:'n', x:'下午。' },
-    { t:'n', x:'你在客厅戴着耳机看书。只戴了一只，另一只没电了。卡什从房间出来，看见你，径直走过来坐在沙发另一头。' },
-    { t:'n', x:'他拿出手机，外放音乐。声音很大。' },
-    { t:'n', x:'你抬头看他。他跟着节奏点头，假装没注意到你的视线。你把书翻了一页。他把音乐又调大了一格。' },
-    { t:'c', x:'【做出选择】', o:[
-      { l:'摘下耳机，看着他，等他自觉。',           to:'s2_a', fx:{ aff:10, dom:5,  irr:-10 } },
-      { l:'直接伸手拿走他的手机，关掉音乐。',         to:'s2_b', fx:{ aff:10, dom:10, irr:0   } },
-      { l:'忍。戴上两只耳机，虽然另一只没电。',       to:'s2_c', fx:{ aff:15, dom:0,  irr:-15 } }
-    ]}
-  ]
-},
+  // 导入后立即刷新 UI（无需改引擎代码）
+  if (type === 'chapter') renderHome();
+  if (type === 'qna') renderQna();
 
-s2_a: {
-  steps: [
-    { t:'n', x:'你摘下耳机，看着他。' },
-    { t:'n', x:'他感觉到了。转头，对上你的视线。你什么都不说，就那么看着他。' },
-    { t:'s', who:'卡什', x:'...What?', cn:'（……干嘛？）' },
-    { t:'n', x:'你不说话。' },
-    { t:'s', who:'卡什', x:'Okay, okay. Fine.', cn:'（行行行。好吧。）' },
-    { t:'n', x:'他把音乐关了，但没走。他坐了一会儿，又开口。' },
-    { t:'s', who:'卡什', x:'What are you reading?', cn:'（你在看什么？）' },
-    { t:'n', x:'你没理。他凑过来看封面，眯着眼辨认了半天。' },
-    { t:'s', who:'卡什', x:'Is that... French?', cn:'（那是……法语？）' },
-    { t:'n', x:'你翻了一页。' },
-    { t:'s', who:'卡什', x:'You speak French? How many languages do you speak?', cn:'（你会说法语？你会说几种语言？）' },
-    { t:'n', x:'你翻了一页。' },
-    { t:'s', who:'卡什', x:"Xiao Heng. Hello. I'm talking to you.", cn:'（小桁。喂。我在跟你说话。）' },
-    { t:'n', x:'你翻了一页。' },
-    { t:'n', x:'他安静了三秒，然后整个人躺倒在沙发上，头枕在你腿旁边，仰着脸看你。' },
-    { t:'s', who:'卡什', x:"I'll wait.", cn:'（我等着。）' }
-  ],
-  next: 's3'
-},
-
-s2_b: {
-  steps: [
-    { t:'n', x:'你伸手，拿走他的手机，关掉音乐，放回他手里。' },
-    { t:'n', x:'全程面无表情。' },
-    { t:'n', x:'他张了张嘴，又合上。你继续看书。他拿着手机愣了一会儿，忽然笑了。' },
-    { t:'s', who:'卡什', x:'You know, most people just ask me to turn it down.', cn:'（你知道吗，大多数人只会叫我关小点声。）' },
-    { t:'n', x:'你翻了一页。' },
-    { t:'s', who:'卡什', x:"You just... took it. That's bold.", cn:'（你就……直接拿走了。挺有种的。）' },
-    { t:'n', x:'他收起手机，没再放音乐。但他也没走。他坐在沙发上，偶尔看你一眼，偶尔看窗外。你翻到下一章的时候，发现他靠着沙发扶手睡着了。呼吸很轻，墨镜滑下来一点。' },
-    { t:'n', x:'你看了他两秒。然后继续看书。' }
-  ],
-  next: 's3'
-},
-
-s2_c: {
-  steps: [
-    { t:'n', x:'你戴上两只耳机。另一只没电，但至少能隔一点音。' },
-    { t:'n', x:'卡什看了你一会儿，把音乐关了。他坐过来一点。' },
-    { t:'s', who:'卡什', x:"Hey. Your other earbud is dead, isn't it?", cn:'（嘿。你另一只耳机没电了吧？）' },
-    { t:'n', x:'你没理。他又坐近了一点。' },
-    { t:'s', who:'卡什', x:"I can tell. You only ever wear one. And it's always the same one.", cn:'（我看得出来。你永远只戴一只。而且永远是同一只。）' },
-    { t:'n', x:'你翻了一页。他靠得更近了，肩膀几乎贴上你的。' },
-    { t:'s', who:'卡什', x:'So technically... you can hear me right now.', cn:'（所以严格来说……你现在能听见我说话。）' },
-    { t:'n', x:'你翻了一页。他笑了，声音很轻。' },
-    { t:'s', who:'卡什', x:"That's okay. I'll just sit here.", cn:'（没关系。我就坐这儿。）' },
-    { t:'n', x:'他真的没再说话。在你旁边坐了一整个下午。你翻完了一章又一章，他安安静静地待着。偶尔你余光瞥到他，他要么在看窗外，要么在看你手里的书。你合上书的时候，他开口。' },
-    { t:'s', who:'卡什', x:'Good book?', cn:'（书好看吗？）' },
-    { t:'n', x:'你看了他一眼。他笑得挺真诚的。' },
-    { t:'s', who:'卡什', x:"What? I'm asking a real question.", cn:'（干嘛？我在认真问。）' },
-    { t:'n', x:'你把书递给他。他接过去翻了翻，满页的法文，他一个字都看不懂。但他认真地翻了几页，最后还给你。' },
-    { t:'s', who:'卡什', x:"I'll learn French too.", cn:'（法语我也要学。）' },
-    { t:'n', x:'你拿回书，回了房间。他在客厅喊。' },
-    { t:'s', who:'卡什', x:"I'm serious! I'll learn!", cn:'（我是认真的！我会学的！）' }
-  ],
-  next: 's3'
-},
-
-/* ══════════ 场景三 ══════════ */
-s3: {
-  steps: [
-    { t:'scene', x:'场景三 · 傍晚出门' },
-    { t:'n', x:'傍晚。' },
-    { t:'n', x:'你下楼扔垃圾。卡什从后面追出来。' },
-    { t:'s', who:'卡什', x:'Where are you going?', cn:'（你去哪？）' },
-    { t:'n', x:'你没回答。他跟着你走到垃圾桶旁边，看你扔完垃圾，又跟着你往回走。走到楼道口，他忽然停下。' },
-    { t:'s', who:'卡什', x:'Wait. I left my keys inside.', cn:'（等等。我把钥匙忘在里面了。）' },
-    { t:'n', x:'他看着你。你看着他。' },
-    { t:'s', who:'卡什', x:"...Can I borrow yours? Just to get back in. I'll give it right back.", cn:'（……能借你的用一下吗？就进去一下。马上还你。）' },
-    { t:'c', x:'【做出选择】', o:[
-      { l:'把你的钥匙给他，在楼下等他。',   to:'s3_a', fx:{ aff:5,  dom:5,  irr:-5  } },
-      { l:'自己上楼开门，让他留在楼下等。', to:'s3_b', fx:{ aff:10, dom:0,  irr:0   } },
-      { l:'拿出手机，让他打电话给房东。',   to:'s3_c', fx:{ aff:5,  dom:10, irr:-10 } }
-    ]}
-  ]
-},
-
-s3_a: {
-  steps: [
-    { t:'n', x:'你把钥匙递给他。他接过去，笑了。' },
-    { t:'s', who:'卡什', x:'Thanks. Be right back.', cn:'（谢了。马上回来。）' },
-    { t:'n', x:'他上楼了。你在楼下等。一分钟。两分钟。三分钟。你听见楼上传来开锁的声音，然后是关门声。又过了两分钟，他还没下来。' },
-    { t:'n', x:'你上楼。打开门。他站在客厅里，手里拿着你的钥匙，正在研究钥匙扣上挂着的一个小挂件。' },
-    { t:'s', who:'卡什', x:"What's this?", cn:'（这是什么？）' },
-    { t:'n', x:'一个很小的金属挂件，磨得发亮，看不出原来的形状。' },
-    { t:'n', x:'你走过去，从他手里拿回钥匙。他也没追问，只是看着你。' },
-    { t:'s', who:'卡什', x:"You don't like people touching your stuff.", cn:'（你不喜欢别人碰你东西。）' },
-    { t:'n', x:'你把钥匙收好。' },
-    { t:'s', who:'卡什', x:'Noted.', cn:'（记住了。）' }
-  ],
-  next: 's4'
-},
-
-s3_b: {
-  steps: [
-    { t:'n', x:'你转身上楼。他跟在你后面。' },
-    { t:'s', who:'卡什', x:'Wait—are you just gonna leave me down here?', cn:'（等等——你就把我扔楼下？）' },
-    { t:'n', x:'你走到门口，打开门，站在门边看着他。他跑上来，从你身边挤进去，在玄关脱鞋的时候抬头看你。' },
-    { t:'s', who:'卡什', x:'You waited.', cn:'（你等了。）' },
-    { t:'n', x:'你没说话。他站起来，经过你身边的时候停了一下。' },
-    { t:'s', who:'卡什', x:'Thanks.', cn:'（谢了。）' },
-    { t:'n', x:'他进了房间。你关上门。晚上他出来倒水的时候，在你房间门口放了一罐可乐。你早上起来看见，拿起来，是冰的。' }
-  ],
-  next: 's4'
-},
-
-s3_c: {
-  steps: [
-    { t:'n', x:'你拿出手机，递给他。' },
-    { t:'s', who:'卡什', x:"...You're not gonna let me in?", cn:'（……你不让我进去？）' },
-    { t:'n', x:'你看着他。他接过手机，拨了房东的号码。等了一会儿。' },
-    { t:'s', who:'卡什', x:"Hey, it's Cash. I'm locked out. Can you—hello? Hello?", cn:'（嘿，是我，卡什。我被锁外面了。你能——喂？喂？）' },
-    { t:'n', x:'他拿开手机看了一眼。' },
-    { t:'s', who:'卡什', x:'He hung up.', cn:'（他挂了。）' },
-    { t:'n', x:'他把手机还给你。你们站在楼道口。天快黑了。' },
-    { t:'s', who:'卡什', x:'So... are we just gonna stand here?', cn:'（所以……我们就站这儿？）' },
-    { t:'n', x:'你转身，上楼，打开门。他跟在后面，什么也没说。进门之后他直接回了房间。过了十分钟，他出来，手里拿着一个东西，放在茶几上。' },
-    { t:'s', who:'卡什', x:'For the trouble.', cn:'（赔罪的。）' },
-    { t:'n', x:'是一盒巧克力。包装很贵。你看了一眼，没动。他也没再说什么，回房间了。那盒巧克力在茶几上放了三天。第四天，你把它收进了柜子里。' }
-  ],
-  next: 's4'
-},
-
-/* ══════════ 场景四 ══════════ */
-s4: {
-  steps: [
-    { t:'scene', x:'场景四 · 夜半敲门' },
-    { t:'n', x:'晚上十一点。' },
-    { t:'n', x:'你正在看书。敲门声。很轻，跟平时不一样。' },
-    { t:'n', x:'你开门。卡什站在门口，穿着T恤和短裤，头发乱着，墨镜没戴。他眯着眼，但你知道他不是在看你，他只是在辨认方向。' },
-    { t:'s', who:'卡什', x:"Hey. Sorry. I know it's late.", cn:'（嘿。抱歉。我知道很晚了。）' },
-    { t:'n', x:'他停了一下。' },
-    { t:'s', who:'卡什', x:"I can't sleep. Do you have... I don't know. Tea? Or something?", cn:'（我睡不着。你有……我也不知道。茶？还是什么？）' },
-    { t:'n', x:'他站在门口，没有往里看。手插在口袋里，肩膀微微缩着。跟白天那个张扬的样子判若两人。' },
-    { t:'c', x:'【做出选择】', o:[
-      { l:'让他进来，给他泡杯茶。',             to:'s4_a', fx:{ aff:15, dom:5,  irr:0  } },
-      { l:'去厨房给他泡茶，让他在门口等。',     to:'s4_b', fx:{ aff:10, dom:0,  irr:0  } },
-      { l:'告诉他厨房在哪，让他自己去。',       to:'s4_c', fx:{ aff:5,  dom:5,  irr:-5 } }
-    ]}
-  ]
-},
-
-s4_a: {
-  steps: [
-    { t:'n', x:'你侧身让开。他愣了一下。' },
-    { t:'s', who:'卡什', x:'...Really?', cn:'（……真的？）' },
-    { t:'n', x:'你转身去泡茶。他进来，坐在沙发上，很安静。你把茶放在他面前，他捧起来喝了一口。' },
-    { t:'s', who:'卡什', x:'This is good. What is it?', cn:'（好喝。这是什么？）' },
-    { t:'n', x:'你告诉他茶的名字。他跟着念了一遍，发音很烂。你纠正了他一次，他又念了一遍，好一点了。他捧着杯子，盯着茶汤看了一会儿。' },
-    { t:'s', who:'卡什', x:"I don't sleep well. New place. New everything.", cn:'（我睡不好。新地方。什么都是新的。）' },
-    { t:'n', x:'你没接话。他也没指望你接。又坐了一会儿，他把茶喝完，站起来。' },
-    { t:'s', who:'卡什', x:"Thanks. I'll go try again.", cn:'（谢了。我再去试试。）' },
-    { t:'n', x:'走到门口，他回头。' },
-    { t:'s', who:'卡什', x:'Goodnight, Xiao Heng.', cn:'（晚安，小桁。）' },
-    { t:'n', x:'你点了点头。他关上门。你收拾杯子的时候发现杯底压着一张小纸条，是他的字，歪歪扭扭写着 "you\'re alright"。' }
-  ],
-  next: 's5'
-},
-
-s4_b: {
-  steps: [
-    { t:'n', x:'你去厨房泡茶。他在门口站着，靠着门框。你端着茶回来，递给他。他接过去，手指碰到你的，很凉。' },
-    { t:'s', who:'卡什', x:'Thanks.', cn:'（谢了。）' },
-    { t:'n', x:'他喝了一口，就站在门口喝完了。你看着他。他喝完之后把杯子还给你。' },
-    { t:'s', who:'卡什', x:"You didn't have to do that.", cn:'（你没必要这样的。）' },
-    { t:'n', x:'你接过杯子。他看了你一眼，转身走了。走了两步又回头。' },
-    { t:'s', who:'卡什', x:'Hey. Xiao Heng.', cn:'（嘿。小桁。）' },
-    { t:'n', x:'你看着他。' },
-    { t:'s', who:'卡什', x:"You're not as cold as you look.", cn:'（你没看上去那么冷。）' },
-    { t:'n', x:'他回房间了。你关上门，杯子还留着他手指的温度。' }
-  ],
-  next: 's5'
-},
-
-s4_c: {
-  steps: [
-    { t:'n', x:'你指了个方向。' },
-    { t:'s', who:'你', x:'厨房。自己泡。' },
-    { t:'n', x:'他张了张嘴。' },
-    { t:'s', who:'卡什', x:'...Okay. Okay, yeah. Sure.', cn:'（……好。好，行。当然。）' },
-    { t:'n', x:'他去了厨房。你听见他翻柜子的声音，水烧开的声音，杯子碰台面的声音。过了很久，他端着杯子出来，站在走廊里，离你房间三步远。' },
-    { t:'s', who:'卡什', x:"I made you one too. I think. It's the same thing.", cn:'（我也给你泡了一杯。应该吧。是一样的东西。）' },
-    { t:'n', x:'他把杯子放在你门口的地上，退后一步。' },
-    { t:'s', who:'卡什', x:"If you don't want it, just leave it. I'll get it in the morning.", cn:'（不想要的话就放着。我早上来收。）' },
-    { t:'n', x:'他回房间了。你打开门，地上放着一杯茶。热的。你端起来，喝了一口。味道还行。杯子你洗了，放在他门口。第二天早上他看见杯子，笑了一下。' }
-  ],
-  next: 's5'
-},
-
-/* ══════════ 场景五 ══════════ */
-s5: {
-  steps: [
-    { t:'scene', x:'场景五 · 超市同行' },
-    { t:'n', x:'周末。' },
-    { t:'n', x:'你出门采购。卡什跟上来。' },
-    { t:'s', who:'卡什', x:"I'm coming. I need food. Real food.", cn:'（我也去。我要买吃的。真正的吃的。）' },
-    { t:'n', x:'你们并排走在路上。他比你高，步子却跟你差不多慢，时不时看你一眼。到超市门口，他推了辆购物车，你拿了购物篮。他看了看你的篮子，又看了看自己的车。' },
-    { t:'s', who:'卡什', x:"We're together. Just use the cart.", cn:'（我们一起的。用车吧。）' },
-    { t:'c', x:'【做出选择】', o:[
-      { l:'把篮子放进购物车，一起逛。',       to:'s5_a', fx:{ aff:15, dom:5,  irr:-5 } },
-      { l:'各逛各的，最后在收银台碰头。',     to:'s5_b', fx:{ aff:10, dom:10, irr:-5 } },
-      { l:'让他把车放回去，用篮子。',         to:'s5_c', fx:{ aff:5,  dom:5,  irr:-5 } }
-    ]}
-  ]
-},
-
-s5_a: {
-  steps: [
-    { t:'n', x:'你把篮子放进购物车。他推着车跟在你旁边。你往左走，他跟着。你停下来看货架，他也停下来。你拿了一盒鸡蛋，他接过去放进车里。' },
-    { t:'s', who:'卡什', x:'What else do you eat? Besides eggs.', cn:'（你还吃什么？除了鸡蛋。）' },
-    { t:'n', x:'你没回答，继续走。他跟着，一边走一边往车里扔东西。薯片，可乐，冷冻披萨。你把他扔进去的披萨拿出来放回货架。他看你。' },
-    { t:'s', who:'卡什', x:"What? It's food.", cn:'（干嘛？那是食物。）' },
-    { t:'n', x:'你又把可乐拿出去。' },
-    { t:'s', who:'卡什', x:"Okay, okay. You're the boss.", cn:'（行行行。你说了算。）' },
-    { t:'n', x:'他老实了，跟着你走完整个超市。结账的时候他抢着付钱，你看了他一眼。他掏出钱包，里面只剩一张皱巴巴的纸币。' },
-    { t:'s', who:'卡什', x:"...Okay. You pay. I'll owe you.", cn:'（……行。你付。我欠你。）' },
-    { t:'n', x:'你付了钱。他拎着袋子跟在你后面回家。路上他忽然说。' },
-    { t:'s', who:'卡什', x:'I used to do this with my mom. Grocery shopping. Before everything.', cn:'（我以前跟我妈一起这样。逛超市。在一切发生之前。）' },
-    { t:'n', x:'你没接话。他也没继续。到家之后他把袋子放在厨房台面上，拿出你买的那盒鸡蛋，放在冰箱最上层。放得很正。' }
-  ],
-  next: 's6'
-},
-
-s5_b: {
-  steps: [
-    { t:'n', x:'你拿了篮子就走。他在身后喊。' },
-    { t:'s', who:'卡什', x:"Fine! I'll meet you at checkout!", cn:'（行！收银台见！）' },
-    { t:'n', x:'你逛完了，到收银台的时候他已经在了。购物车里堆着一座小山：薯片、能量饮料、速食通心粉、巧克力、还有一盒创可贴。' },
-    { t:'s', who:'卡什', x:'I got stuff.', cn:'（我买了东西。）' },
-    { t:'n', x:'你看着那堆东西，又看了他一眼。他耸耸肩。' },
-    { t:'s', who:'卡什', x:"What? It's the essentials.", cn:'（干嘛？都是必需品。）' },
-    { t:'n', x:'你结完自己的账，站在旁边等他。他掏钱包的时候动作很慢，最后拿出那张皱巴巴的纸币，数了半天，又放了回去。他掏出手机，折腾了一会儿，最后看向你。' },
-    { t:'s', who:'卡什', x:"...Can you spot me? I'll pay you back.", cn:'（……能借我点吗？还你。）' },
-    { t:'n', x:'你替他付了。他拎着袋子跟在你后面，一路上很安静。到家之后他把东西收拾好，然后走进你房间，把一张纸币放在你桌上。你抬头看他。' },
-    { t:'s', who:'卡什', x:"It's all I have. I'll get the rest later.", cn:'（就这些了。剩下的以后再给。）' },
-    { t:'n', x:'你看了看那张纸币，又看了看他。他站在门口，手插在口袋里，视线落在别处。你拿起纸币，放回他手里。他愣住了。' },
-    { t:'s', who:'你', x:'下次别买那么多没用的。' },
-    { t:'n', x:'他没说话。拿着纸币站了一会儿，转身走了。' }
-  ],
-  next: 's6'
-},
-
-s5_c: {
-  steps: [
-    { t:'n', x:'你指了指购物车，又指了指停放处。他叹了口气，把车推回去，拎了个篮子回来。' },
-    { t:'s', who:'卡什', x:'Happy?', cn:'（满意了？）' },
-    { t:'n', x:'你们并排走。他拎着篮子，你往里面放东西。他跟着你，一边走一边抱怨篮子太重，手太酸，为什么不能买车。你没理他。走到零食区的时候他停住了。' },
-    { t:'s', who:'卡什', x:'Wait. Just one thing. Please.', cn:'（等等。就一样。求你了。）' },
-    { t:'n', x:'他拿了一包棉花糖，看着你。' },
-    { t:'s', who:'卡什', x:"Just this. I'll carry the basket the whole way.", cn:'（就这个。我全程拎篮子。）' },
-    { t:'n', x:'你点了点头。他把棉花糖放进篮子，笑得像赢了什么大奖。结账的时候他抢着付，被你拦住了。他拎着袋子跟在你后面回家，一路上都在吃棉花糖，时不时递一颗到你面前。' },
-    { t:'s', who:'卡什', x:"Try it. It's good.", cn:'（尝尝。好吃。）' },
-    { t:'n', x:'你摇头。他继续吃。到家的时候棉花糖只剩半袋，他把它放在茶几上，回房间了。你经过茶几的时候看了一眼那半袋棉花糖，过了一会儿，你拿了一颗。' }
-  ],
-  next: 's6'
-},
-
-/* ══════════ 场景六 ══════════ */
-s6: {
-  steps: [
-    { t:'scene', x:'场景六 · 耳机没电' },
-    { t:'n', x:'晚上。' },
-    { t:'n', x:'你戴着耳机听歌。另一只耳机没电了，你只戴了一只。卡什从房间出来，看见你，走过来坐在旁边。' },
-    { t:'s', who:'卡什', x:'One earbud again.', cn:'（又是一只耳机。）' },
-    { t:'n', x:'你没理他。他坐近了一点。' },
-    { t:'s', who:'卡什', x:"You know, I've been thinking.", cn:'（你知道吗，我一直在想。）' },
-    { t:'n', x:'你翻了一页书。' },
-    { t:'s', who:'卡什', x:"If your other earbud is always dead... why don't you buy new ones?", cn:'（如果你另一只耳机总是没电……为什么不买新的？）' },
-    { t:'n', x:'你翻了一页。' },
-    { t:'s', who:'卡什', x:'Or... you could just use one. Which you do. So why not just use one and not carry the dead one around?', cn:'（或者……你就用一只。你本来就是。那为什么不干脆只用一只，不带那只死的？）' },
-    { t:'n', x:'你翻了一页。' },
-    { t:'s', who:'卡什', x:"I'm genuinely asking. I want to understand.", cn:'（我真的在问。我想搞明白。）' },
-    { t:'n', x:'他把下巴搁在你肩膀上。' },
-    { t:'s', who:'卡什', x:'Is it a habit? Comfort thing? Or do you just like making people wonder?', cn:'（是习惯？图个安心？还是你就喜欢让人猜？）' },
-    { t:'c', x:'【做出选择】', o:[
-      { l:'摘下耳机回答他。',                   to:'s6_a', fx:{ aff:10, dom:5,  irr:-5  } },
-      { l:'不理他，继续看书。',                 to:'s6_b', fx:{ aff:10, dom:0,  irr:-10 } },
-      { l:'把没电的那只耳机塞进他手里。',       to:'s6_c', fx:{ aff:5,  dom:10, irr:-5  } }
-    ]}
-  ]
-},
-
-s6_a: {
-  steps: [
-    { t:'n', x:'你摘下耳机，看着他。' },
-    { t:'s', who:'你', x:'习惯了。' },
-    { t:'n', x:'卡什愣了愣。' },
-    { t:'s', who:'卡什', x:"...That's it?", cn:'（……就这样？）' },
-    { t:'n', x:'你点头。' },
-    { t:'s', who:'卡什', x:'You answered me. You actually answered.', cn:'（你回答我了。你真的回答了。）' },
-    { t:'n', x:'他坐直了，表情认真起来。' },
-    { t:'s', who:'卡什', x:"Okay. Since you're answering questions. What's your favorite color?", cn:'（好。既然你开始回答问题了。你最喜欢什么颜色？）' },
-    { t:'n', x:'你没理他，重新戴上耳机。他在旁边笑。' },
-    { t:'s', who:'卡什', x:'Worth a shot.', cn:'（试试嘛。）' }
-  ],
-  next: 's7'
-},
-
-s6_b: {
-  steps: [
-    { t:'n', x:'你继续看书。' },
-    { t:'n', x:'他等了一会儿，没等到回答。' },
-    { t:'s', who:'卡什', x:'Okay. Silent treatment. I know this one.', cn:'（行。沉默对待。我认识这招。）' },
-    { t:'n', x:'他没走。他靠在你旁边，安安静静地待着。过了很久，你翻完一章，转头看他。他靠在你肩上睡着了。呼吸很轻，睫毛在灯光下投了一小片阴影。' },
-    { t:'n', x:'你没动。又翻了一章。' }
-  ],
-  next: 's7'
-},
-
-s6_c: {
-  steps: [
-    { t:'n', x:'你把没电的那只耳机摘下来，塞进他手里。' },
-    { t:'n', x:'他低头看了看。' },
-    { t:'s', who:'卡什', x:'...What?', cn:'（……什么？）' },
-    { t:'n', x:'你没说话。他捏着那只耳机，翻来覆去看了看，又看了看你。' },
-    { t:'s', who:'卡什', x:'Is this a gift? A very... dead... gift?', cn:'（这是礼物吗？一个非常……没电的……礼物？）' },
-    { t:'n', x:'你翻了一页。' },
-    { t:'n', x:'他把耳机塞进口袋里。' },
-    { t:'s', who:'卡什', x:"I'll keep it. My first gift from Xiao Heng.", cn:'（我收下了。小桁送我的第一份礼物。）' },
-    { t:'n', x:'你抬头看他。他已经站起来了，拍了拍口袋。' },
-    { t:'s', who:'卡什', x:'Goodnight.', cn:'（晚安。）' },
-    { t:'n', x:'他走了。第二天你路过他房间，门开着，那只没电的耳机被他摆在床头柜上，旁边是充电器。他没充，就那么摆着。' }
-  ],
-  next: 's7'
-},
-
-/* ══════════ 场景七 ══════════ */
-s7: {
-  steps: [
-    { t:'scene', x:'场景七 · 雨夜' },
-    { t:'n', x:'下雨了。' },
-    { t:'n', x:'你从浴室出来，听见敲门声。卡什站在门口，头发湿了，T恤贴在身上，墨镜全是水珠。' },
-    { t:'s', who:'卡什', x:"The window. My room. It won't close.", cn:'（窗户。我房间的。关不上。）' },
-    { t:'n', x:'他侧身让你看他房间的方向。水从窗台渗进来，流了一小片。' },
-    { t:'s', who:'卡什', x:"I tried. I really tried. I don't know how.", cn:'（我试了。真的试了。我不会。）' },
-    { t:'c', x:'【做出选择】', o:[
-      { l:'去他房间修窗户。',                   to:'s7_a', fx:{ aff:15, dom:5,  irr:-5 } },
-      { l:'让他先拿毛巾擦干，你去找工具。',     to:'s7_b', fx:{ aff:10, dom:5,  irr:-5 } },
-      { l:'让他今晚睡客厅沙发，明天再修。',     to:'s7_c', fx:{ aff:5,  dom:10, irr:-5 } }
-    ]}
-  ]
-},
-
-s7_a: {
-  steps: [
-    { t:'n', x:'你跟着他进了房间。窗户卡住了，滑轮错位。你检查了一下，回自己房间拿了工具，三下五除二修好了。全程他站在旁边看，很安静。' },
-    { t:'n', x:'修好之后你站起来。他站在离你很近的地方。' },
-    { t:'s', who:'卡什', x:"You're really good at that.", cn:'（你真的很擅长这个。）' },
-    { t:'n', x:'你收好工具。他递过来一条毛巾。' },
-    { t:'s', who:'卡什', x:'For your hands.', cn:'（擦手的。）' },
-    { t:'n', x:'你接过来擦了擦。他坐在床边看着你。房间很暗，只有窗外的路灯透进来一点光。他忽然开口。' },
-    { t:'s', who:'卡什', x:'Can I ask you something?', cn:'（我能问你个问题吗？）' },
-    { t:'n', x:'你看着他。他张了张嘴，又合上。最后摇了摇头。' },
-    { t:'s', who:'卡什', x:'Never mind. Thanks for the window.', cn:'（算了。窗户谢了。）' },
-    { t:'n', x:'你走了。关上门的时候，你听见他在里面叹了口气。' }
-  ],
-  next: 's8'
-},
-
-s7_b: {
-  steps: [
-    { t:'n', x:'你让他去拿毛巾。他在浴室翻了半天，拿了一条很小的毛巾回来。你看了他一眼，去自己房间拿了工具，修好了窗户。他站在旁边，头发还在滴水。' },
-    { t:'n', x:'你修完之后，把毛巾扔给他。' },
-    { t:'s', who:'你', x:'擦。' },
-    { t:'n', x:'他接住，乖乖擦头发。你收拾工具准备走，他叫住你。' },
-    { t:'s', who:'卡什', x:'Hey. Wait.', cn:'（嘿。等等。）' },
-    { t:'n', x:'你回头。他站在窗边，街灯照着他半边脸。' },
-    { t:'s', who:'卡什', x:'Thanks. For real.', cn:'（谢谢。真的。）' },
-    { t:'n', x:'你点了点头。他笑了一下，那个笑跟白天的很不一样，很轻，很安静。' },
-    { t:'s', who:'卡什', x:'Goodnight.', cn:'（晚安。）' }
-  ],
-  next: 's8'
-},
-
-s7_c: {
-  steps: [
-    { t:'n', x:'你告诉他今晚睡客厅，明天修。' },
-    { t:'s', who:'卡什', x:'...Okay. Yeah. Sure.', cn:'（……好。行。当然。）' },
-    { t:'n', x:'你回房间了。过了一会儿，你出来倒水，看见他躺在沙发上，盖着一件外套，脚悬在扶手外面。他听见你的脚步声，翻了个身面朝沙发靠背。' },
-    { t:'s', who:'卡什', x:"I'm fine. Go back to sleep.", cn:'（我没事。回去睡吧。）' },
-    { t:'n', x:'你站在原地。他缩了缩，沙发太短，他整个人蜷着。你回房间拿了一条毯子，盖在他身上。他没动，但你知道他醒着。' },
-    { t:'n', x:'你回房间之后，过了很久，听见客厅传来很轻的一声。' },
-    { t:'s', who:'卡什', x:'...Thanks.', cn:'（……谢谢。）' }
-  ],
-  next: 's8'
-},
-
-/* ══════════ 场景八 ══════════ */
-s8: {
-  steps: [
-    { t:'scene', x:'场景八 · 墨镜之下' },
-    { t:'n', x:'第二天早上。' },
-    { t:'n', x:'你走出房间，卡什坐在餐桌前，没戴墨镜。他听到你的脚步声，抬起头，眯着眼朝你的方向看。' },
-    { t:'s', who:'卡什', x:'Morning.', cn:'（早。）' },
-    { t:'n', x:'他的蓝眼睛在晨光里颜色很浅，没有焦点，但方向是对的。桌上放着两杯咖啡。他推了一杯到你常坐的位置。' },
-    { t:'s', who:'卡什', x:'I made it. I think I got it right. No sugar, right?', cn:'（我泡的。应该没错吧。不加糖，对吧？）' },
-    { t:'n', x:'你坐下来。咖啡的味道很正。他盯着你的方向，等你喝第一口。' },
-    { t:'s', who:'卡什', x:'Well?', cn:'（怎么样？）' },
-    { t:'n', x:'你放下杯子。' },
-    { t:'s', who:'你', x:'还行。' },
-    { t:'n', x:'他笑了。' },
-    { t:'s', who:'卡什', x:"I'll take it.", cn:'（我接受了。）' },
-    { t:'n', x:'他站起来，去厨房拿东西。经过你身边的时候，手准确地落在你肩上，拍了一下。' },
-    { t:'s', who:'卡什', x:'Progress.', cn:'（进步了。）' },
-    { t:'n', x:'他走回厨房。你低头看咖啡，杯底没有渣。他确实用心了。' },
-    { t:'n', x:'但当你抬头看向厨房的方向，你注意到他在台面上摸了一下才找到吐司袋。你看着他的背影，他浑然不觉。' },
-    { t:'n', x:'你喝了一口咖啡。' },
-    { t:'hr' },
-    { t:'end', id:'e_ch1' }
-  ]
+  return {
+    ok:true,
+    added:added,
+    updated:updated,
+    msg:'已导入 ' + validItems.length + ' 条：新增 ' + added + '，覆盖更新 ' + updated +
+        '（' + names.slice(0,3).join('、') + (names.length>3 ? ' 等' : '') + '）'
+  };
 }
 
+/* ---------------------------- 工坊事件 ---------------------------- */
+function wsLog(type, html){
+  const el = $('#wsLog');
+  el.className = 'ws-log show ' + type;
+  el.innerHTML = html;
+}
+
+function bindWorkshop(){
+  $('#wsImport').onclick = function(){
+    const txt = $('#wsInput').value.trim();
+    if (!txt){ wsLog('warn','请输入 JSON 内容'); return; }
+    const res = importJSON(wsCurrent, txt);
+    if (res.ok){
+      wsLog('ok', '✅ ' + esc(res.msg));
+      toast('导入成功', 'ok');
+      renderWorkshop();
+    } else {
+      wsLog('err', '❌ 校验失败，已存数据未被修改：<ul>' +
+        res.errors.slice(0,12).map(function(e){ return '<li>' + esc(e) + '</li>'; }).join('') +
+        (res.errors.length > 12 ? '<li>…还有 ' + (res.errors.length-12) + ' 条</li>' : '') +
+        '</ul>');
+      toast('校验失败', 'err');
+    }
+  };
+
+  $('#wsFormat').onclick = function(){
+    try{
+      const obj = JSON.parse($('#wsInput').value);
+      $('#wsInput').value = JSON.stringify(obj, null, 2);
+      wsLog('ok','已格式化');
+    }catch(e){
+      wsLog('err','❌ 不是合法 JSON：' + esc(e.message));
+    }
+  };
+
+  $('#wsTemplate').onclick = function(){
+    $('#wsInput').value = JSON.stringify(WS_TEMPLATES[wsCurrent] || {}, null, 2);
+    wsLog('ok','已插入模板，可自行修改后导入');
+  };
+
+  $('#wsClear').onclick = function(){
+    $('#wsInput').value = '';
+    $('#wsLog').className = 'ws-log';
+  };
+
+  $('#wsExportAll').onclick = function(){
+    const pack = {
+      format:'HZY_EXPORT',
+      version:1,
+      exportedAt: nowISO(),
+      data:{
+        chapters: DB.chapters,
+        qna: DB.qna,
+        charinfo: DB.charinfo,
+        relations: DB.relations,
+        sides: DB.sides,
+        levels: DB.levels
+      },
+      save: mainSave,
+      slots: K.slots.map(function(k){ return store.get(k, null); }),
+      config: DB.config,
+      achievements: store.get(K.achievements, null)
+    };
+    const d = new Date();
+    const name = 'HZY_export_' + d.getFullYear() + pad2(d.getMonth()+1) + pad2(d.getDate()) +
+                 '_' + pad2(d.getHours()) + pad2(d.getMinutes()) + '.json';
+    download(name, JSON.stringify(pack, null, 2));
+    toast('已导出：' + name, 'ok');
+  };
+
+  $('#wsExportRaw').onclick = function(){
+    const pack = {
+      format:'HZY_CONTENT',
+      version:1,
+      exportedAt: nowISO(),
+      data:{
+        chapters: DB.chapters,
+        qna: DB.qna,
+        charinfo: DB.charinfo,
+        relations: DB.relations,
+        sides: DB.sides,
+        levels: DB.levels
+      }
+    };
+    download('HZY_content_' + dateKey() + '.json', JSON.stringify(pack, null, 2));
+    toast('已导出纯内容库', 'ok');
+  };
+
+  $('#wsImportFile').onclick = function(){
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = '.json,application/json';
+    inp.onchange = function(){
+      const f = inp.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = function(){ $('#wsInput').value = r.result; wsLog('ok','已载入文件内容，请选择类型后点击「校验并导入」'); };
+      r.readAsText(f, 'utf-8');
+    };
+    inp.click();
+  };
+}
+
+/* ---------------------------- 导入模板 ---------------------------- */
+const WS_TEMPLATES = {
+  chapter:{
+    type:'chapter',
+    id:'ch02',
+    title:'第二章 · 章节标题',
+    order:2,
+    author:'官方',
+    beats:[
+      { id:'c1', type:'narration', text:'旁白文本。' },
+      { id:'c2', type:'dialogue', speaker:'卡什', text:'「English line.」——中文脑补翻译。', affection:2 },
+      { id:'c3', type:'inner', speaker:'小桁', text:'（内心独白。）' },
+      { id:'c4', type:'choice', prompt:'你要怎么回应？', options:[
+        { text:'选项 A', affection:5, next:'c5a' },
+        { text:'选项 B（好感度 50 以上才显示）', affection:3, next:'c5b', require:{ affectionMin:50 } }
+      ]},
+      { id:'c5a', type:'dialogue', speaker:'卡什', text:'回应 A 的结果。', next:'c6' },
+      { id:'c5b', type:'dialogue', speaker:'卡什', text:'回应 B 的结果。', next:'c6' },
+      { id:'c6', type:'narration', text:'汇合后的旁白。' },
+      { id:'cEND', type:'chapter_end' }
+    ]
+  },
+  qna:{
+    type:'qna',
+    id:'qa_007',
+    category:'日常',
+    unlock:10,
+    question:'问题文本？',
+    answer:'卡什的回答文本。\n可以换行。'
+  },
+  charinfo:{
+    type:'charinfo',
+    target:'cash',
+    group:'档案',
+    id:'ci_cash_new',
+    unlock:20,
+    title:'条目标题',
+    content:'内容文本。\n可以换行。'
+  },
+  relation:{
+    type:'relation',
+    id:'rel_new',
+    unlock:15,
+    name:'角色名',
+    role:'关系描述',
+    desc:'详细说明。'
+  },
+  side:{
+    type:'side',
+    id:'side_02',
+    title:'彩蛋 · 标题',
+    intro:'一句话简介。',
+    unlock:{ affectionMin:20 },
+    beats:[
+      { id:'s1', type:'narration', text:'副本旁白。' },
+      { id:'s2', type:'dialogue', speaker:'卡什', text:'副本对白。' },
+      { id:'s3', type:'choice', prompt:'选择？', options:[
+        { text:'选项一', affection:3, next:'s4' },
+        { text:'选项二', affection:-1, next:'s4' }
+      ]},
+      { id:'s4', type:'narration', text:'副本结束语。' },
+      { id:'sEND', type:'chapter_end' }
+    ]
+  },
+  affection_levels:{
+    type:'affection_levels',
+    levels:[
+      { min:1,  max:9,   name:'陌生人' },
+      { min:10, max:19,  name:'点头之交' },
+      { min:20, max:29,  name:'室友' },
+      { min:30, max:39,  name:'损友' },
+      { min:40, max:49,  name:'有点意思' },
+      { min:50, max:59,  name:'暧昧' },
+      { min:60, max:69,  name:'心动' },
+      { min:70, max:79,  name:'恋人未满' },
+      { min:80, max:89,  name:'热恋' },
+      { min:90, max:99,  name:'唯一' },
+      { min:100,max:100, name:'灵魂烙印' }
+    ]
   }
-});
+};
+
+/* ============================================================================
+   =========================  PART 10 · 模态框  ===============================
+   ============================================================================ */
+
+function openModal(opt){
+  const box = $('#modalBox');
+  let h = '<div class="modal-head"><span>' + (opt.title || '') + '</span>' +
+          '<button class="icon-btn" data-close>✕</button></div>' +
+          '<div class="modal-body">' + (opt.body || '') + '</div>';
+
+  if (opt.buttons && opt.buttons.length){
+    h += '<div class="modal-foot">';
+    opt.buttons.forEach(function(b, i){
+      h += '<button class="btn sm ' + (b.cls||'') + '" data-btn="' + i + '">' + esc(b.text) + '</button>';
+    });
+    h += '</div>';
+  }
+  box.innerHTML = h;
+
+  $$('[data-close]', box).forEach(function(b){ b.onclick = closeModal; });
+  if (opt.buttons){
+    opt.buttons.forEach(function(b, i){
+      const el = $('[data-btn="' + i + '"]', box);
+      if (el) el.onclick = b.act || closeModal;
+    });
+  }
+
+  $('#modalWrap').classList.add('show');
+}
+
+function closeModal(){
+  $('#modalWrap').classList.remove('show');
+}
+
+/* ---------------------------- 存档槽模态框 ---------------------------- */
+function openSlotsModal(){
+  let h = '<div class="modal-head"><span>存档</span><button class="icon-btn" data-close>✕</button></div>';
+  h += '<div class="modal-body">';
+
+  // 自动存档
+  h += '<div class="slot">' +
+         '<div class="slot-idx">A</div>' +
+         '<div class="slot-info">' +
+           '<div class="slot-title">自动存档 · ' + esc(mainSave.chapterId ? (DB.chapters[mainSave.chapterId] ? DB.chapters[mainSave.chapterId].title : mainSave.chapterId) : '尚未开始') + '</div>' +
+           '<div class="slot-meta">' + fmtDate(mainSave.updated) + ' · 好感度 ' + mainSave.affection + ' · ' + esc(getLevelName(mainSave.affection)) + '</div>' +
+         '</div>' +
+       '</div>';
+
+  // 手动槽
+  for (let i=0;i<3;i++){
+    const slot = store.get(K.slots[i], null);
+    h += '<div class="slot">' +
+           '<div class="slot-idx">' + (i+1) + '</div>' +
+           '<div class="slot-info">' +
+             (slot
+               ? '<div class="slot-title">' + esc(slot.chapterTitle || '未知章节') + '</div>' +
+                 '<div class="slot-meta">' + fmtDate(slot.ts) + ' · 好感度 ' + slot.affection + ' · ' + esc(slot.summary || '') + '</div>'
+               : '<div class="slot-title" style="color:var(--ink-faint)">空存档槽</div>' +
+                 '<div class="slot-meta">——</div>') +
+           '</div>' +
+           '<div class="slot-actions">' +
+             '<button class="btn sm btn-primary" data-save="' + i + '">保存</button>' +
+             (slot ? '<button class="btn sm" data-load="' + i + '">读取</button>' +
+                     '<button class="btn sm" data-del="' + i + '">删除</button>' : '') +
+           '</div>' +
+         '</div>';
+  }
+  h += '</div>';
+
+  openModal({ title:'', body:'' });
+  const box = $('#modalBox');
+  box.innerHTML = h;
+  $$('[data-close]', box).forEach(b => b.onclick = closeModal);
+  $$('[data-save]', box).forEach(function(b){
+    b.onclick = function(){ saveToSlot(parseInt(b.dataset.save,10)); openSlotsModal(); };
+  });
+  $$('[data-load]', box).forEach(function(b){
+    b.onclick = function(){ loadFromSlot(parseInt(b.dataset.load,10)); };
+  });
+  $$('[data-del]', box).forEach(function(b){
+    b.onclick = function(){ deleteSlot(parseInt(b.dataset.del,10)); };
+  });
+}
+
+/* ---------------------------- 历史记录模态框 ---------------------------- */
+function openHistoryModal(){
+  const list = (App.history || []).slice(-120).reverse();
+  let h = '<div class="modal-head"><span>对话历史</span><button class="icon-btn" data-close>✕</button></div>';
+  h += '<div class="modal-body">';
+  if (!list.length){
+    h += '<div class="empty-tip">还没有记录</div>';
+  } else {
+    list.forEach(function(it){
+      h += '<div class="hist-item ' + it.type + '">' +
+             (it.speaker ? '<div class="hist-who">' + esc(it.speaker) + '</div>' : '') +
+             '<div class="hist-text">' + esc(it.text) + '</div>' +
+           '</div>';
+    });
+  }
+  h += '</div>';
+  openModal({ title:'', body:'' });
+  const box = $('#modalBox');
+  box.innerHTML = h;
+  $$('[data-close]', box).forEach(b => b.onclick = closeModal);
+}
+
+/* ---------------------------- 设置模态框 ---------------------------- */
+function openSettingsModal(){
+  const cfg = DB.config;
+  let h = '<div class="modal-head"><span>设置</span><button class="icon-btn" data-close>✕</button></div>';
+  h += '<div class="modal-body">';
+
+  h += '<div class="set-row">' +
+         '<div class="set-name">打字机效果<small>逐字显示对白</small></div>' +
+         '<div class="switch' + (cfg.typewriter ? ' on' : '') + '" data-cfg="typewriter"></div>' +
+       '</div>';
+
+  h += '<div class="set-row">' +
+         '<div class="set-name">打字速度<small>数值越大越慢</small></div>' +
+         '<input type="range" min="0" max="80" step="4" value="' + cfg.speed + '" data-cfg="speed">' +
+       '</div>';
+
+  h += '<div class="set-row">' +
+         '<div class="set-name">字号<small>整体缩放</small></div>' +
+         '<input type="range" min="0.85" max="1.3" step="0.05" value="' + cfg.fontScale + '" data-cfg="fontScale">' +
+       '</div>';
+
+  h += '<div class="set-row">' +
+         '<div class="set-name">深色模式<small>夜间护眼</small></div>' +
+         '<div class="switch' + (cfg.dark ? ' on' : '') + '" data-cfg="dark"></div>' +
+       '</div>';
+
+  h += '<div class="set-row">' +
+         '<div class="set-name">等级特效<small>好感度升级全屏提示</small></div>' +
+         '<div class="switch' + (cfg.showLevelUp ? ' on' : '') + '" data-cfg="showLevelUp"></div>' +
+       '</div>';
+
+  h += '<div class="set-row">' +
+         '<div class="set-name">CRT 屏幕感<small>轻微扫描线滤镜</small></div>' +
+         '<div class="switch' + (cfg.crt ? ' on' : '') + '" data-cfg="crt"></div>' +
+       '</div>';
+
+  h += '<div class="set-row">' +
+         '<div class="set-name">音效 Hook<small>预留接口，暂无音频资源</small></div>' +
+         '<div class="switch' + (cfg.sound ? ' on' : '') + '" data-cfg="sound"></div>' +
+       '</div>';
+
+  h += '<div style="margin-top:20px;padding-top:16px;border-top:1px dashed var(--line)">' +
+         '<button class="btn sm" id="setResetSave" style="width:100%">重置主线存档（保留内容库）</button>' +
+       '</div>';
+
+  h += '</div>';
+
+  openModal({ title:'', body:'' });
+  const box = $('#modalBox');
+  box.innerHTML = h;
+  $$('[data-close]', box).forEach(b => b.onclick = closeModal);
+
+  $$('[data-cfg]', box).forEach(function(el){
+    const key = el.dataset.cfg;
+    if (el.classList.contains('switch')){
+      el.onclick = function(){
+        cfg[key] = !cfg[key];
+        el.classList.toggle('on', cfg[key]);
+        applyConfig();
+        store.set(K.config, cfg);
+      };
+    } else {
+      el.oninput = function(){
+        cfg[key] = parseFloat(el.value);
+        applyConfig();
+        store.set(K.config, cfg);
+      };
+    }
+  });
+
+  const rst = $('#setResetSave', box);
+  if (rst){
+    rst.onclick = function(){
+      openModal({
+        title:'重置主线存档？',
+        body:'将清空好感度、剧情进度、已读记录与历史。<br>内容库（章节/Q&A/档案）与成就保留。',
+        buttons:[
+          { text:'取消', act: closeModal },
+          { text:'确认重置', cls:'btn-primary', act: function(){
+            mainSave = newMainSave();
+            App.seen = mainSave.seen;
+            App.history = mainSave.history;
+            App.applied = mainSave.applied;
+            saveMain();
+            closeModal();
+            renderHome();
+            toast('主线存档已重置', 'ok');
+          }}
+        ]
+      });
+    };
+  }
+}
+
+/* ============================================================================
+   =========================  PART 11 · 附加玩法  =============================
+   ============================================================================ */
+
+/* --------------------------- 每日一签 --------------------------- */
+function checkDaily(){
+  const today = dateKey();
+  const last = store.get(K.daily, null);
+  if (last && last.date === today) return;
+
+  store.set(K.daily, { date: today, ts: Date.now() });
+
+  // 从未开始过游戏的玩家不弹
+  if (!mainSave.started) return;
+
+  setTimeout(function(){
+    const aff = getAffection();
+    // 优先从已解锁的 Q&A 中挑
+    const pool = Object.keys(DB.qna).map(k => DB.qna[k])
+                   .filter(q => aff >= (q.unlock||0));
+    let line;
+    if (pool.length){
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+      line = pick.answer;
+    } else {
+      const fallback = [
+        '「Morning. 咖啡呢？」',
+        '「喂，你昨天是不是又熬夜了。黑眼圈比我还重。」',
+        '「今天去哪？带我。反正我也没事干。」',
+        '「你做的那个……那个红色的东西，还有吗？」',
+        '「Listen. 我认真的：你的翻译水平，值一顿饭。」'
+      ];
+      line = fallback[Math.floor(Math.random() * fallback.length)];
+    }
+
+    openModal({
+      title:'今日随谈 · ' + today,
+      body:'<div style="font-size:.78rem;letter-spacing:.2em;color:var(--cash);font-family:var(--font-sans);margin-bottom:10px">CASH SAYS</div>' +
+           '<div style="line-height:2">' + esc(line).replace(/\n/g,'<br>') + '</div>' +
+           '<div style="margin-top:16px;font-size:.72rem;color:var(--ink-faint);font-family:var(--font-sans)">' +
+             '当前好感度 ' + aff + ' · ' + esc(getLevelName(aff)) +
+           '</div>',
+      buttons:[{ text:'今天也加油', cls:'btn-primary', act: closeModal }]
+    });
+  }, 900);
+}
+
+/* --------------------------- 触摸互动 --------------------------- */
+const TOUCH_LINES = {
+  low:[
+    '「干嘛？」',
+    '「Don\'t poke me.」——别戳我。',
+    '「……你是不是很闲。」',
+    '「Say something or go away.」——有话就说，没事走开。'
+  ],
+  mid:[
+    '「Yo. 手拿开。」（但他没躲。）',
+    '「你戳我干嘛。……再来一下试试？」',
+    '「Okay, okay, I\'m awake.」——好了好了，我醒了。',
+    '他把墨镜往下推了一点点，看了你一眼，又推回去。'
+  ],
+  high:[
+    '「……」他没说话，只是往你这边靠了靠。',
+    '「You know what, 你戳人的时候，跟你说话的口气一点不一样。」',
+    '「别停啊。」',
+    '他笑了一下，嘴角那颗痣先动了起来。'
+  ],
+  max:[
+    '「Come here.」——过来。',
+    '他直接把你的手按住了，没用力，但也没打算放。',
+    '「……你知不知道你笑起来挺要命的。」',
+    '「别走。」他的声音很轻，「就一会儿。」'
+  ]
+};
+
+function hideBubble(){
+  $('#gBubble').classList.remove('show');
+}
+
+function touchPortrait(){
+  const aff = getAffection();
+  let pool;
+  if (aff >= 90) pool = TOUCH_LINES.max;
+  else if (aff >= 60) pool = TOUCH_LINES.high;
+  else if (aff >= 30) pool = TOUCH_LINES.mid;
+  else pool = TOUCH_LINES.low;
+
+  const line = pool[Math.floor(Math.random() * pool.length)];
+  const bubble = $('#gBubble');
+  bubble.textContent = line;
+  bubble.classList.add('show');
+
+  const p = $('#gPortrait');
+  p.classList.remove('pop');
+  void p.offsetWidth;
+  p.classList.add('pop');
+
+  clearTimeout(touchPortrait._t);
+  touchPortrait._t = setTimeout(hideBubble, 2600);
+}
+
+/* --------------------------- 剧情搜索 --------------------------- */
+function globalSearch(kw){
+  kw = (kw||'').trim().toLowerCase();
+  if (!kw) return [];
+  const res = [];
+  const aff = getAffection();
+
+  Object.keys(DB.qna).forEach(function(k){
+    const q = DB.qna[k];
+    if (aff < (q.unlock||0)) return;
+    const s = ((q.question||'') + (q.answer||'')).toLowerCase();
+    if (s.indexOf(kw) >= 0) res.push({ kind:'Q&A', title:q.question, text:q.answer });
+  });
+
+  Object.keys(DB.charinfo).forEach(function(k){
+    const c = DB.charinfo[k];
+    if (aff < (c.unlock||0)) return;
+    const s = ((c.title||'') + (c.content||'')).toLowerCase();
+    if (s.indexOf(kw) >= 0) res.push({ kind:'档案', title:c.title, text:c.content });
+  });
+
+  (App.history||[]).forEach(function(h){
+    if (String(h.text||'').toLowerCase().indexOf(kw) >= 0){
+      res.push({ kind:'对白', title:h.speaker || '旁白', text:h.text });
+    }
+  });
+
+  return res.slice(0, 60);
+}
+
+/* ============================================================================
+   =========================  PART 12 · 导入导出  =============================
+   ============================================================================ */
+
+function importFullPack(pack, mode){
+  // mode: 'merge' | 'replace'
+  if (!pack || pack.format !== 'HZY_EXPORT' && pack.format !== 'HZY_CONTENT'){
+    if (!pack.data) return { ok:false, msg:'不是有效的 HZY 导出文件' };
+  }
+
+  const d = pack.data || {};
+
+  if (mode === 'replace'){
+    DB.chapters  = d.chapters  || {};
+    DB.qna       = d.qna       || {};
+    DB.charinfo  = d.charinfo  || {};
+    DB.relations = d.relations || {};
+    DB.sides     = d.sides     || {};
+    DB.levels    = (d.levels && d.levels.length) ? d.levels : DEFAULT_LEVELS.slice();
+  } else {
+    // 合并：同 id 覆盖
+    ['chapters','qna','charinfo','relations','sides'].forEach(function(key){
+      if (!d[key]) return;
+      Object.keys(d[key]).forEach(function(id){ DB[key][id] = d[key][id]; });
+    });
+    if (d.levels && d.levels.length) DB.levels = d.levels;
+  }
+
+  store.set(K.chapters, DB.chapters);
+  store.set(K.qna, DB.qna);
+  store.set(K.charinfo, DB.charinfo);
+  store.set(K.relations, DB.relations);
+  store.set(K.sides, DB.sides);
+  store.set(K.levels, { type:'affection_levels', levels: DB.levels });
+
+  // 存档（仅完整导出包含）
+  if (pack.save && pack.format === 'HZY_EXPORT'){
+    mainSave = Object.assign(newMainSave(), pack.save);
+    App.seen = mainSave.seen;
+    App.history = mainSave.history;
+    App.applied = mainSave.applied;
+    saveMain();
+  }
+
+  if (pack.slots && Array.isArray(pack.slots)){
+    pack.slots.forEach(function(s, i){
+      if (s && K.slots[i]) store.set(K.slots[i], s);
+    });
+  }
+
+  if (pack.config){
+    DB.config = Object.assign({}, DEFAULT_CONFIG, pack.config);
+    store.set(K.config, DB.config);
+    applyConfig();
+  }
+
+  renderHome();
+  return { ok:true, msg:'导入完成' };
+}
+
+function openImportModal(){
+  let h = '<div class="modal-head"><span>导入</span><button class="icon-btn" data-close>✕</button></div>';
+  h += '<div class="modal-body">' +
+         '<p style="margin-bottom:14px;font-size:.84rem;color:var(--ink-soft)">' +
+           '可以导入别人分享的完整包（含剧情库 + 存档），也可以导入纯内容库。' +
+         '</p>' +
+         '<button class="btn sm" id="impFile" style="width:100%;margin-bottom:10px">📁 选择 JSON 文件</button>' +
+         '<div class="ws-label" style="margin-top:16px">或直接粘贴 JSON</div>' +
+         '<textarea class="ws-textarea" id="impText" style="min-height:140px" placeholder="粘贴导出的 JSON…"></textarea>' +
+         '<div class="ws-actions">' +
+           '<button class="btn sm btn-primary" id="impMerge">合并导入</button>' +
+           '<button class="btn sm" id="impReplace">覆盖导入</button>' +
+         '</div>' +
+       '</div>';
+
+  openModal({ title:'', body:'' });
+  const box = $('#modalBox');
+  box.innerHTML = h;
+  $$('[data-close]', box).forEach(b => b.onclick = closeModal);
+
+  $('#impFile', box).onclick = function(){
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = '.json,application/json';
+    inp.onchange = function(){
+      const f = inp.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = function(){ $('#impText', box).value = r.result; toast('文件已载入', 'ok'); };
+      r.readAsText(f, 'utf-8');
+    };
+    inp.click();
+  };
+
+  function doImport(mode){
+    const txt = $('#impText', box).value.trim();
+    if (!txt){ toast('请输入或载入 JSON', 'warn'); return; }
+    let pack;
+    try{ pack = JSON.parse(txt); }
+    catch(e){ toast('JSON 解析失败：' + e.message, 'err'); return; }
+
+    const res = importFullPack(pack, mode);
+    if (res.ok){
+      closeModal();
+      toast('导入成功', 'ok');
+      renderHome();
+    } else {
+      toast(res.msg, 'err');
+    }
+  }
+
+  $('#impMerge', box).onclick = function(){ doImport('merge'); };
+  $('#impReplace', box).onclick = function(){ doImport('replace'); };
+}
+
+function openShareModal(){
+  const pack = {
+    format:'HZY_EXPORT',
+    version:1,
+    exportedAt: nowISO(),
+    data:{
+      chapters: DB.chapters,
+      qna: DB.qna,
+      charinfo: DB.charinfo,
+      relations: DB.relations,
+      sides: DB.sides,
+      levels: DB.levels
+    },
+    save: mainSave,
+    slots: K.slots.map(function(k){ return store.get(k, null); }),
+    config: DB.config
+  };
+  const json = JSON.stringify(pack, null, 2);
+
+  let h = '<div class="modal-head"><span>分享</span><button class="icon-btn" data-close>✕</button></div>';
+  h += '<div class="modal-body">' +
+         '<p style="font-size:.84rem;color:var(--ink-soft);margin-bottom:14px">' +
+           '导出文件包含：全部剧情库、Q&A、档案、关系、彩蛋副本、好感度等级表，以及你的主线存档与解锁状态。' +
+           '<br>对方导入后，可以直接从你的进度继续。' +
+         '</p>' +
+         '<div class="ws-actions">' +
+           '<button class="btn sm btn-primary" id="shDownload">⬇ 下载 JSON 文件</button>' +
+           '<button class="btn sm" id="shCopy">📋 复制文本</button>' +
+         '</div>' +
+         '<div class="ws-label" style="margin-top:18px">预览（' + (json.length/1024).toFixed(1) + ' KB）</div>' +
+         '<textarea class="ws-textarea" style="min-height:150px;font-size:.72rem" readonly>' + esc(json.slice(0, 2000)) + (json.length>2000?'\n…（已截断）':'') + '</textarea>' +
+       '</div>';
+
+  openModal({ title:'', body:'' });
+  const box = $('#modalBox');
+  box.innerHTML = h;
+  $$('[data-close]', box).forEach(b => b.onclick = closeModal);
+
+  $('#shDownload', box).onclick = function(){
+    const d = new Date();
+    const name = 'HZY_export_' + d.getFullYear() + pad2(d.getMonth()+1) + pad2(d.getDate()) +
+                 '_' + pad2(d.getHours()) + pad2(d.getMinutes()) + '.json';
+    download(name, json);
+    toast('已下载：' + name, 'ok');
+  };
+
+  $('#shCopy', box).onclick = function(){
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(json).then(function(){
+        toast('已复制到剪贴板', 'ok');
+      }).catch(function(){
+        toast('复制失败，请手动选择文本', 'err');
+      });
+    } else {
+      toast('浏览器不支持自动复制', 'warn');
+    }
+  };
+}
+
+/* ============================================================================
+   =========================  PART 13 · 配置应用  =============================
+   ============================================================================ */
+function applyConfig(){
+  const cfg = DB.config;
+  document.documentElement.setAttribute('data-theme', cfg.dark ? 'dark' : 'light');
+  document.documentElement.style.setProperty('--fs', cfg.fontScale || 1);
+  document.body.classList.toggle('crt', !!cfg.crt);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', cfg.dark ? '#1C1917' : '#FFFBF2');
+}
+
+/* ============================================================================
+   =========================  PART 14 · 数据完整性检测  =======================
+   ============================================================================ */
+function checkIntegrity(){
+  const issues = [];
+  const aff = getAffection();
+
+  Object.keys(DB.chapters).forEach(function(k){
+    const c = DB.chapters[k];
+    if (!c.beats || !c.beats.length) issues.push('章节「' + (c.title||k) + '」缺少 beats');
+    else if (typeof c.order !== 'number') issues.push('章节「' + (c.title||k) + '」缺少 order');
+  });
+
+  Object.keys(DB.qna).forEach(function(k){
+    const q = DB.qna[k];
+    if (!q.question || q.answer == null) issues.push('Q&A「' + k + '」字段不完整');
+  });
+
+  Object.keys(DB.charinfo).forEach(function(k){
+    const c = DB.charinfo[k];
+    if (!c.title || c.content == null) issues.push('档案「' + k + '」字段不完整');
+  });
+
+  Object.keys(DB.sides).forEach(function(k){
+    const s = DB.sides[k];
+    if (!s.beats || !s.beats.length) issues.push('副本「' + (s.title||k) + '」缺少 beats');
+  });
+
+  if (!DB.levels.length) issues.push('好感度等级表为空');
+
+  const banner = $('#integrityBanner');
+  if (issues.length){
+    banner.innerHTML =
+      '<div class="integrity-banner">' +
+        '⚠ 检测到 ' + issues.length + ' 处数据问题：<br>' +
+        issues.slice(0,3).map(function(s){ return '· ' + esc(s); }).join('<br>') +
+        (issues.length > 3 ? '<br>· …还有 ' + (issues.length-3) + ' 条' : '') +
+        '<br><span style="opacity:.75">请前往「代码工坊」重新导入修正。</span>' +
+      '</div>';
+  } else {
+    banner.innerHTML = '';
+  }
+}
+
+/* ============================================================================
+   =========================  PART 15 · 事件绑定  =============================
+   ============================================================================ */
+function bindEvents(){
+
+  /* ---------- 主页 ---------- */
+  $('#btnStart').onclick      = startNewGame;
+  $('#btnContinue').onclick   = continueGame;
+  $('#btnQna').onclick        = function(){ showPage('page-qna'); };
+  $('#btnInfo').onclick       = function(){ showPage('page-info'); };
+  $('#btnSide').onclick       = function(){ showPage('page-side'); };
+  $('#btnWorkshop').onclick   = function(){ showPage('page-workshop'); };
+  $('#btnSlots').onclick      = openSlotsModal;
+  $('#btnShare').onclick      = openShareModal;
+  $('#btnImport').onclick     = openImportModal;
+  $('#btnSettings').onclick   = openSettingsModal;
+
+  /* ---------- 返回按钮（通用） ---------- */
+  $$('[data-back]').forEach(function(b){
+    b.onclick = function(){
+      if (App.mode === 'side'){ exitToSideList(); return; }
+      exitToHome();
+    };
+  });
+
+  /* ---------- 游戏页 ---------- */
+  $('#gBtnBack').onclick = function(){
+    if (App.mode === 'side'){
+      openModal({
+        title:'退出副本？',
+        body:'副本进度已自动保存，退出不会影响主线。',
+        buttons:[
+          { text:'继续游玩', act: closeModal },
+          { text:'退出副本', cls:'btn-primary', act: function(){ closeModal(); exitToSideList(); }}
+        ]
+      });
+      return;
+    }
+    if (App.mode === 'replay'){
+      App.mode = 'main';
+      exitToHome();
+      return;
+    }
+    saveProgress();
+    exitToHome();
+  };
+
+  $('#gBtnSettings').onclick = openSettingsModal;
+  $('#gBtnHistory').onclick  = openHistoryModal;
+  $('#gBtnAuto').onclick     = toggleAuto;
+  $('#gBtnSkip').onclick     = toggleSkip;
+  $('#gBtnSave').onclick     = openSlotsModal;
+
+  // 点击对话框推进
+  $('#gBox').addEventListener('click', function(){
+    const beat = App.currentBeat;
+    if (!beat) return;
+    if (beat.type === 'choice') return;      // 选项由按钮接管
+    if (beat.type === 'chapter_end') return;
+
+    if (finishTyping()) return;              // 第一次点击：跳过打字
+    if (App.skipMode) return;
+    advance();
+  });
+
+  // 点击舞台空白推进
+  $('#gameStage').addEventListener('click', function(e){
+    if (e.target.closest('.choices')) return;
+    if (e.target.closest('.portrait-zone')) return;
+    if (e.target.closest('#gBox')) return;
+    const beat = App.currentBeat;
+    if (!beat) return;
+    if (beat.type === 'choice' || beat.type === 'chapter_end') return;
+    if (finishTyping()) return;
+    if (App.skipMode) return;
+    advance();
+  });
+
+  // 触摸互动
+  $('#gPortrait').addEventListener('click', function(e){
+    e.stopPropagation();
+    touchPortrait();
+  });
+
+  /* ---------- Q&A 搜索 ---------- */
+  $('#qnaSearch').addEventListener('input', function(){
+    if (App.page === 'page-qna') renderQna();
+  });
+
+  /* ---------- 角色档案标签 ---------- */
+  $$('#infoTabs .tab').forEach(function(t){
+    t.onclick = function(){
+      App.infoTab = t.dataset.itab;
+      renderInfo();
+    };
+  });
+
+  /* ---------- 模态框背景关闭 ---------- */
+  $('#modalWrap').addEventListener('click', function(e){
+    if (e.target === $('#modalWrap')) closeModal();
+  });
+
+  /* ---------- 键盘 ---------- */
+  document.addEventListener('keydown', function(e){
+    if (App.page !== 'page-game') return;
+    if (e.key === ' ' || e.key === 'Enter'){
+      e.preventDefault();
+      const beat = App.currentBeat;
+      if (!beat || beat.type === 'choice' || beat.type === 'chapter_end') return;
+      if (finishTyping()) return;
+      advance();
+    }
+    if (e.key === 'Escape'){
+      if ($('#modalWrap').classList.contains('show')) closeModal();
+    }
+  });
+}
+
+/* ============================================================================
+   =========================  PART 16 · 初始化  ===============================
+   ============================================================================ */
+function loadDB(){
+  /* --- 读取各内容库；首次运行时注入默认数据 --- */
+  let chapters = store.get(K.chapters, null);
+  if (!chapters || typeof chapters !== 'object'){
+    chapters = {};
+    chapters[DEFAULT_CH01.id] = DEFAULT_CH01;
+    store.set(K.chapters, chapters);
+  }
+  DB.chapters = chapters;
+
+  let qna = store.get(K.qna, null);
+  if (!qna || typeof qna !== 'object'){
+    qna = {};
+    DEFAULT_QNA.forEach(function(q){ qna[q.id] = q; });
+    store.set(K.qna, qna);
+  }
+  DB.qna = qna;
+
+  let charinfo = store.get(K.charinfo, null);
+  if (!charinfo || typeof charinfo !== 'object'){
+    charinfo = {};
+    DEFAULT_CHARINFO.forEach(function(c){ charinfo[c.id] = c; });
+    store.set(K.charinfo, charinfo);
+  }
+  DB.charinfo = charinfo;
+
+  let relations = store.get(K.relations, null);
+  if (!relations || typeof relations !== 'object'){
+    relations = {};
+    DEFAULT_RELATIONS.forEach(function(r){ relations[r.id] = r; });
+    store.set(K.relations, relations);
+  }
+  DB.relations = relations;
+
+  let sides = store.get(K.sides, null);
+  if (!sides || typeof sides !== 'object'){
+    sides = {};
+    DEFAULT_SIDES.forEach(function(s){ sides[s.id] = s; });
+    store.set(K.sides, sides);
+  }
+  DB.sides = sides;
+
+  const lvPack = store.get(K.levels, null);
+  DB.levels = (lvPack && Array.isArray(lvPack.levels) && lvPack.levels.length)
+    ? lvPack.levels
+    : DEFAULT_LEVELS.slice();
+
+  DB.config = Object.assign({}, DEFAULT_CONFIG, store.get(K.config, {}));
+  DB.achievements = store.get(K.achievements, []) || [];
+}
+
+function init(){
+  loadDB();
+  loadMain();
+  applyConfig();
+  bindEvents();
+  bindWorkshop();
+  renderHome();
+  updateAffectionUI();
+  checkIntegrity();
+  checkDaily();
+
+  // 自动存档（页面关闭前）
+  window.addEventListener('beforeunload', function(){
+    if (App.mode === 'main' && App.chapter){
+      saveProgress();
+    }
+  });
+
+  console.log('%c《和室友恋爱的错误示范》引擎已启动','color:#E86A48;font-weight:bold;font-size:14px');
+  console.log('内容库：章节 ' + Object.keys(DB.chapters).length +
+              ' / Q&A ' + Object.keys(DB.qna).length +
+              ' / 档案 ' + Object.keys(DB.charinfo).length +
+              ' / 关系 ' + Object.keys(DB.relations).length +
+              ' / 副本 ' + Object.keys(DB.sides).length);
+}
+
+document.addEventListener('DOMContentLoaded', init);
+
+// 兼容：DOMContentLoaded 已过的情况
+if (document.readyState === 'interactive' || document.readyState === 'complete'){
+  setTimeout(function(){ if (!window.__hzy_inited){ window.__hzy_inited = true; init(); } }, 0);
+} else {
+  window.__hzy_inited = true;
+}
 
 })();
 </script>
